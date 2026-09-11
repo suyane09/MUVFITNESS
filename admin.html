@@ -995,10 +995,6 @@ function enterApp(){
   document.getElementById('sideAvatar').textContent = creds.user.slice(0,1).toUpperCase();
   renderAll();
 }
-if(isLoggedIn()){
-  try{ enterApp(); }
-  catch(err){ console.error('[MUV admin] erro ao entrar no painel:', err); }
-}
 
 document.getElementById('loginForm').addEventListener('submit', function(e){
   e.preventDefault();
@@ -1850,6 +1846,16 @@ window.addEventListener('storage', function(ev){
     if(active==='customers') renderCustomers();
   }
 });
+
+/* =========================================================
+   ENTRADA NO PAINEL
+   (fica por último de propósito: por aqui, todas as variáveis
+   e funções usadas pelas telas já existem e foram inicializadas)
+========================================================= */
+if(isLoggedIn()){
+  try{ enterApp(); }
+  catch(err){ console.error('[MUV admin] erro ao entrar no painel:', err); }
+}
 
 })();
 </script>
