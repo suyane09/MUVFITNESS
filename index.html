@@ -202,6 +202,9 @@
   .prod-card .price strong{color:var(--ink);}
   .prod-card .old{text-decoration:line-through;color:#b3aa9d;margin-right:6px;}
   .prod-card .install{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .prod-color-row{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+  .prod-color-dot{width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex-shrink:0;}
+  .prod-color-more{font-size:10.5px;color:var(--ink-soft);font-weight:600;}
   .see-all-wrap{text-align:center;margin-top:44px;}
 
   /* ===== PRODUCT PAGE (full page, replaces store listing when a product is open) ===== */
@@ -1453,9 +1456,18 @@
       var tagHtml = stockNum <= 0 ? '<span class="tag">Esgotado</span>' : (p.tag ? '<span class="tag">' + esc(p.tag) + '</span>' : '');
       var price = Number(p.price) || 0;
       var installHtml = 'Até 12x de ' + esc(brl(price / 12));
-      var colorsJson = esc(JSON.stringify(Array.isArray(p.colors) ? p.colors : []));
+      var colorsArr = Array.isArray(p.colors) ? p.colors : [];
+      var colorsJson = esc(JSON.stringify(colorsArr));
       var sizesJson = esc(JSON.stringify(Array.isArray(p.sizes) ? p.sizes : []));
       var variantsJson = esc(JSON.stringify(Array.isArray(p.variants) ? p.variants : []));
+      var colorDotsHtml = '';
+      if (colorsArr.length){
+        var shown = colorsArr.slice(0, 6).map(function(c){
+          return '<span class="prod-color-dot" style="background:' + esc(c.hex || '#ccc') + '" title="' + esc(c.name || '') + '"></span>';
+        }).join('');
+        var moreHtml = colorsArr.length > 6 ? '<span class="prod-color-more">+' + (colorsArr.length - 6) + '</span>' : '';
+        colorDotsHtml = '<div class="prod-color-row">' + shown + moreHtml + '</div>';
+      }
       return (
         '<div class="prod-card" data-id="' + esc(p.id) + '" data-subcat="' + esc(p.subcat || '') + '" data-name="' + esc(p.name) + '" data-price="' + price.toFixed(2) + '" data-stock="' + stockNum + '" data-colors="' + colorsJson + '" data-sizes="' + sizesJson + '" data-variants="' + variantsJson + '">' +
           '<div class="prod-thumb">' +
@@ -1466,6 +1478,7 @@
           '</div>' +
           '<h4>' + esc(p.name) + '</h4>' +
           '<div class="price">' + oldPriceHtml + '<strong>' + esc(brl(price)) + '</strong></div>' +
+          colorDotsHtml +
           '<span class="install">' + installHtml + '</span>' +
         '</div>'
       );
