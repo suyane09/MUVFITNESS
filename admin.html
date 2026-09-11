@@ -251,6 +251,7 @@ tbody tr:last-child td{border-bottom:none;}
 .pf-variant-add-row input[type="text"]:focus{border-color:var(--pink-deep);outline:none;}
 .pf-variant-add-row input[type="color"]{width:42px;height:40px;padding:2px;border:1.4px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;}
 .pf-chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.pf-chip-empty{font-size:12px;color:var(--ink-faint);font-style:italic;}
 .pf-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg);border:1.4px solid var(--line);border-radius:100px;padding:6px 8px 6px 12px;font-size:12.5px;font-weight:600;color:var(--ink);}
 .pf-chip .swatch{width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex-shrink:0;}
 .pf-chip button{background:rgba(35,31,29,.08);border:none;width:17px;height:17px;border-radius:50%;font-size:10px;line-height:1;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0;}
@@ -776,12 +777,12 @@ tbody tr:last-child td{border-bottom:none;}
           <div class="field full">
             <label>Cores disponíveis</label>
             <div class="pf-variant-add-row">
-              <input type="color" id="pfColorHex" value="#d9a3b1" title="Escolher cor">
+              <input type="color" id="pfColorHex" value="#cccccc" title="Escolher cor">
               <input type="text" id="pfColorName" placeholder="Nome da cor (ex: Rosa nude)">
               <button type="button" class="btn btn-ghost btn-sm" id="pfAddColorBtn">+ Adicionar cor</button>
             </div>
             <div id="pfColorList" class="pf-chip-list"></div>
-            <div class="field-hint" style="margin-top:8px;">Cadastre cada cor em que este produto é vendido.</div>
+            <div class="field-hint" style="margin-top:8px;">Digite o nome, escolha a cor e clique em <strong>"+ Adicionar cor"</strong> — ela só entra na lista acima depois disso. Repita para cada cor, depois clique em "Salvar produto".</div>
           </div>
           <div class="field full">
             <label>Tamanhos disponíveis</label>
@@ -1447,6 +1448,10 @@ const COMMON_SIZES = ['PP','P','M','G','GG','XG','Único'];
 
 function renderPfColorList(){
   const list = document.getElementById('pfColorList');
+  if(!pendingColors.length){
+    list.innerHTML = '<span class="pf-chip-empty">Nenhuma cor adicionada ainda.</span>';
+    return;
+  }
   list.innerHTML = pendingColors.map((c,i)=>`
     <span class="pf-chip"><span class="swatch" style="background:${c.hex}"></span>${c.name}<button type="button" data-i="${i}" title="Remover cor">✕</button></span>
   `).join('');
@@ -1481,6 +1486,10 @@ function renderPfSizeQuick(){
 
 function renderPfSizeList(){
   const list = document.getElementById('pfSizeList');
+  if(!pendingSizes.length){
+    list.innerHTML = '';
+    return;
+  }
   list.innerHTML = pendingSizes.map((s,i)=>`<span class="pf-chip">${s}<button type="button" data-i="${i}" title="Remover tamanho">✕</button></span>`).join('');
   list.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -1589,7 +1598,7 @@ function openProductModal(id){
   renderPfImgList();
   document.getElementById('pfActive').checked = true;
   document.getElementById('pfNovidade').checked = false;
-  document.getElementById('pfColorHex').value = '#d9a3b1';
+  document.getElementById('pfColorHex').value = '#cccccc';
 
   if(id){
     const p = products.find(x=>x.id===id);
@@ -1655,6 +1664,10 @@ document.getElementById('pfImgInput').addEventListener('change', function(e){
 
 document.getElementById('productForm').addEventListener('submit', function(e){
   e.preventDefault();
+  // Segurança: se a pessoa digitou uma cor ou tamanho mas esqueceu de clicar
+  // em "+ Adicionar", adiciona automaticamente antes de salvar, pra não perder o que foi digitado.
+  if(document.getElementById('pfColorName').value.trim()) addPfColor();
+  if(document.getElementById('pfSizeCustom').value.trim()) addPfCustomSize();
   const hasGrade = pendingColors.length>0 && pendingSizes.length>0;
   const stockValue = hasGrade
     ? pendingVariants.reduce((s,v)=>s+(parseInt(v.stock)||0), 0)
