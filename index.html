@@ -307,13 +307,23 @@
   .pp-option-label{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:9px;display:block;}
   .pp-option-label strong{font-weight:600;color:var(--ink-soft);margin-left:2px;}
   .pp-swatches{display:flex;gap:8px;flex-wrap:wrap;}
-  .pp-swatches-alert .pp-swatch{animation:pp-shake .5s;border-color:#c0392b;}
+  .pp-swatches-alert .pp-swatch, .pp-swatches-alert .pp-color-swatch{animation:pp-shake .5s;border-color:#c0392b;}
   @keyframes pp-shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-3px);}40%{transform:translateX(3px);}60%{transform:translateX(-3px);}80%{transform:translateX(3px);}}
   .pp-swatch{
     padding:8px 15px;border-radius:8px;border:1.4px solid var(--line);background:var(--white);
     font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .2s ease;
   }
   .pp-swatch.active{border-color:var(--ink);background:var(--ink);color:var(--white);}
+  .pp-color-swatch{
+    display:inline-flex;align-items:center;gap:8px;padding:7px 15px 7px 9px;border-radius:100px;border:1.4px solid var(--line);
+    background:var(--white);font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .2s ease;
+  }
+  .pp-color-swatch .dot{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex-shrink:0;}
+  .pp-color-swatch.active{border-color:var(--ink);background:var(--ink);color:var(--white);}
+  .pp-color-swatch.active .dot{border-color:rgba(255,255,255,.6);}
+  .pp-stock-note{font-size:12px;color:var(--ink-soft);margin:-8px 0 18px;}
+  .pp-stock-note.low{color:#a8452f;font-weight:600;}
+  .pp-add-btn:disabled{opacity:.45;cursor:not-allowed;}
   .pp-add-btn{
     margin-top:6px;width:100%;max-width:340px;padding:15px;border-radius:100px;border:none;background:var(--ink);
     color:var(--white);font-size:12.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
@@ -997,10 +1007,15 @@
         </div>
         <div class="pp-price" id="ppPrice"></div>
         <div class="pp-install" id="ppInstall"></div>
+        <div class="pp-option-group" id="ppColorGroup" style="display:none;">
+          <span class="pp-option-label">Cor: <strong id="ppColorValue"></strong></span>
+          <div class="pp-swatches" id="ppColors"></div>
+        </div>
         <div class="pp-option-group" id="ppSizeGroup">
           <span class="pp-option-label">Tamanho: <strong id="ppSizeValue">M</strong></span>
           <div class="pp-swatches" id="ppSizes"></div>
         </div>
+        <div class="pp-stock-note" id="ppStockNote"></div>
         <button class="pp-add-btn" id="ppAddBtn">Adicionar ao carrinho</button>
         <div class="pp-perks">
           <div class="pp-perk">
@@ -1434,11 +1449,15 @@
         return '<div class="img-extra"><img src="' + esc(src) + '" alt="' + esc(p.name) + '"></div>';
       }).join('');
       var oldPriceHtml = p.oldPrice ? '<span class="old">' + esc(brl(p.oldPrice)) + '</span>' : '';
-      var tagHtml = p.tag ? '<span class="tag">' + esc(p.tag) + '</span>' : '';
+      var stockNum = Number(p.stock) || 0;
+      var tagHtml = stockNum <= 0 ? '<span class="tag">Esgotado</span>' : (p.tag ? '<span class="tag">' + esc(p.tag) + '</span>' : '');
       var price = Number(p.price) || 0;
       var installHtml = 'Até 12x de ' + esc(brl(price / 12));
+      var colorsJson = esc(JSON.stringify(Array.isArray(p.colors) ? p.colors : []));
+      var sizesJson = esc(JSON.stringify(Array.isArray(p.sizes) ? p.sizes : []));
+      var variantsJson = esc(JSON.stringify(Array.isArray(p.variants) ? p.variants : []));
       return (
-        '<div class="prod-card" data-id="' + esc(p.id) + '" data-subcat="' + esc(p.subcat || '') + '" data-name="' + esc(p.name) + '" data-price="' + price.toFixed(2) + '">' +
+        '<div class="prod-card" data-id="' + esc(p.id) + '" data-subcat="' + esc(p.subcat || '') + '" data-name="' + esc(p.name) + '" data-price="' + price.toFixed(2) + '" data-stock="' + stockNum + '" data-colors="' + colorsJson + '" data-sizes="' + sizesJson + '" data-variants="' + variantsJson + '">' +
           '<div class="prod-thumb">' +
             tagHtml +
             '<div class="img-a">' + imgAHtml + '</div>' +
@@ -1699,17 +1718,45 @@
   /* =========================================================
      PRODUCT INDEX (built from the DOM, used by search + cart)
   ========================================================= */
-  const PRODUCTS = Array.from(document.querySelectorAll('.prod-card')).map(card => ({
-    id: card.dataset.id,
-    name: card.dataset.name,
-    price: parseFloat(card.dataset.price),
-    oldPriceText: card.querySelector('.old')?.textContent || '',
-    install: card.querySelector('.install')?.textContent || '',
-    tag: card.querySelector('.tag')?.textContent || '',
-    section: card.closest('section')?.id || '',
-    subcat: card.dataset.subcat || '',
-    images: Array.from(card.querySelectorAll('.img-a, .img-b, .img-extra')).map(el => el.innerHTML)
-  }));
+  const PRODUCTS = Array.from(document.querySelectorAll('.prod-card')).map(card => {
+    let colors = [], sizes = [], variants = [];
+    try { colors = JSON.parse(card.dataset.colors || '[]') || []; } catch (e) { colors = []; }
+    try { sizes = JSON.parse(card.dataset.sizes || '[]') || []; } catch (e) { sizes = []; }
+    try { variants = JSON.parse(card.dataset.variants || '[]') || []; } catch (e) { variants = []; }
+    // stock: only enforced for products that came from the admin panel (data-stock present).
+    // Static/hardcoded cards without data-stock are treated as unlimited (stock = null).
+    const stock = card.dataset.stock !== undefined ? (parseInt(card.dataset.stock) || 0) : null;
+    return {
+      id: card.dataset.id,
+      name: card.dataset.name,
+      price: parseFloat(card.dataset.price),
+      oldPriceText: card.querySelector('.old')?.textContent || '',
+      install: card.querySelector('.install')?.textContent || '',
+      tag: card.querySelector('.tag')?.textContent || '',
+      section: card.closest('section')?.id || '',
+      subcat: card.dataset.subcat || '',
+      images: Array.from(card.querySelectorAll('.img-a, .img-b, .img-extra')).map(el => el.innerHTML),
+      colors, sizes, variants, stock
+    };
+  });
+
+  // Estoque disponível para um produto numa combinação de cor/tamanho.
+  // Retorna null quando o estoque não é controlado (produto sem dado de estoque).
+  function getAvailableStock(p, color, size){
+    if (!p) return null;
+    if (Array.isArray(p.variants) && p.variants.length){
+      const v = p.variants.find(x => x.color === color && x.size === size);
+      return v ? (parseInt(v.stock) || 0) : 0;
+    }
+    if (p.stock === null || p.stock === undefined) return null;
+    return parseInt(p.stock) || 0;
+  }
+
+  // Quantidade já no carrinho para esse produto + cor + tamanho.
+  function qtyInCart(id, color, size){
+    return cart.filter(x => x.id === id && (x.color||'') === (color||'') && (x.size||'') === (size||''))
+      .reduce((s, x) => s + x.qty, 0);
+  }
 
   function brl(n){
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1746,9 +1793,10 @@
     const p = PRODUCTS.find(x => x.id === id);
     if (!p) return;
     const size = meta && meta.size ? meta.size : '';
-    const existing = cart.find(x => x.id === id && x.size === size);
+    const color = meta && meta.color ? meta.color : '';
+    const existing = cart.find(x => x.id === id && x.size === size && x.color === color);
     if (existing){ existing.qty++; }
-    else { cart.push({ id: p.id, name: p.name, price: p.price, qty: 1, size, image: p.images[0] || '' }); }
+    else { cart.push({ id: p.id, name: p.name, price: p.price, qty: 1, size, color, image: p.images[0] || '' }); }
     saveCart();
     showToast(p.name + ' adicionado ao carrinho');
   }
@@ -1765,14 +1813,62 @@
   const ppCrumbName = document.getElementById('ppCrumbName');
   const ppPrice = document.getElementById('ppPrice');
   const ppInstall = document.getElementById('ppInstall');
+  const ppColorGroup = document.getElementById('ppColorGroup');
+  const ppColors = document.getElementById('ppColors');
+  const ppColorValue = document.getElementById('ppColorValue');
   const ppSizeGroup = document.getElementById('ppSizeGroup');
   const ppSizes = document.getElementById('ppSizes');
   const ppSizeValue = document.getElementById('ppSizeValue');
+  const ppStockNote = document.getElementById('ppStockNote');
   const ppAddBtn = document.getElementById('ppAddBtn');
   const ppBackLink = document.getElementById('ppBackLink');
   let currentPdpId = null;
+  let currentPdpColor = '';
+  let currentPdpSize = '';
 
   let pdpOrigin = 'home'; // 'home' | 'category' — remembers where to return after closing the PDP
+
+  function updatePdpStockNote(){
+    const p = PRODUCTS.find(x => x.id === currentPdpId);
+    ppStockNote.classList.remove('low');
+    if (!p){ ppStockNote.textContent = ''; ppAddBtn.disabled = false; ppAddBtn.textContent = 'Adicionar ao carrinho'; return; }
+
+    const colorNeeded = ppColorGroup.style.display !== 'none';
+    const sizeNeeded = ppSizeGroup.style.display !== 'none';
+    if ((colorNeeded && !currentPdpColor) || (sizeNeeded && !currentPdpSize)){
+      ppStockNote.textContent = '';
+      ppAddBtn.disabled = false;
+      ppAddBtn.textContent = 'Adicionar ao carrinho';
+      return;
+    }
+
+    const available = getAvailableStock(p, currentPdpColor, currentPdpSize);
+    ppAddBtn.textContent = 'Adicionar ao carrinho';
+    if (available === null){
+      ppStockNote.textContent = '';
+      ppAddBtn.disabled = false;
+      return;
+    }
+    const already = qtyInCart(p.id, currentPdpColor, currentPdpSize);
+    const remaining = available - already;
+    if (available <= 0){
+      ppStockNote.textContent = 'Produto esgotado nessa combinação.';
+      ppStockNote.classList.add('low');
+      ppAddBtn.disabled = true;
+      ppAddBtn.textContent = 'Esgotado';
+    } else if (remaining <= 0){
+      ppStockNote.textContent = 'Você já colocou no carrinho todo o estoque disponível (' + available + ' un.).';
+      ppStockNote.classList.add('low');
+      ppAddBtn.disabled = true;
+    } else if (available <= 5){
+      ppStockNote.textContent = 'Apenas ' + available + ' unidade' + (available > 1 ? 's' : '') + ' em estoque.';
+      ppStockNote.classList.add('low');
+      ppAddBtn.disabled = false;
+    } else {
+      ppStockNote.textContent = '';
+      ppAddBtn.disabled = false;
+    }
+  }
 
   function openProductDetail(id, opts){
     const p = PRODUCTS.find(x => x.id === id);
@@ -1798,24 +1894,52 @@
       });
     });
 
-    // size selector — hidden for accessories, shown for apparel
-    if (p.section === 'acessorios'){
+    currentPdpColor = '';
+    currentPdpSize = '';
+
+    // color selector — only shown when the product has colors cadastradas no admin
+    if (p.colors && p.colors.length){
+      ppColorGroup.style.display = '';
+      ppColorValue.textContent = 'Selecione';
+      ppColors.innerHTML = p.colors.map((c) =>
+        `<button type="button" class="pp-color-swatch" data-color="${c.name}"><span class="dot" style="background:${c.hex || '#ccc'}"></span>${c.name}</button>`
+      ).join('');
+      ppColors.querySelectorAll('.pp-color-swatch').forEach(btn => {
+        btn.addEventListener('click', () => {
+          ppColors.querySelectorAll('.pp-color-swatch').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          currentPdpColor = btn.dataset.color;
+          ppColorValue.textContent = currentPdpColor;
+          updatePdpStockNote();
+        });
+      });
+    } else {
+      ppColorGroup.style.display = 'none';
+    }
+
+    // size selector — hidden for accessories with no sizes cadastrados;
+    // uses the sizes cadastrados no admin quando existirem, senão o padrão P/M/G.
+    const sizeList = (p.sizes && p.sizes.length) ? p.sizes : (p.section === 'acessorios' ? [] : ['P', 'M', 'G']);
+    if (!sizeList.length){
       ppSizeGroup.style.display = 'none';
     } else {
       ppSizeGroup.style.display = '';
-      const sizes = ['P', 'M', 'G'];
       ppSizeValue.textContent = 'Selecione';
-      ppSizes.innerHTML = sizes.map((s) =>
+      ppSizes.innerHTML = sizeList.map((s) =>
         `<button type="button" class="pp-swatch" data-size="${s}">${s}</button>`
       ).join('');
       ppSizes.querySelectorAll('.pp-swatch').forEach(btn => {
         btn.addEventListener('click', () => {
           ppSizes.querySelectorAll('.pp-swatch').forEach(x => x.classList.remove('active'));
           btn.classList.add('active');
-          ppSizeValue.textContent = btn.dataset.size;
+          currentPdpSize = btn.dataset.size;
+          ppSizeValue.textContent = currentPdpSize;
+          updatePdpStockNote();
         });
       });
     }
+
+    updatePdpStockNote();
 
     mainContent.classList.add('hidden');
     categoryPage.classList.remove('active');
@@ -1849,19 +1973,39 @@
   ppBackLink.addEventListener('click', () => closeProductDetail());
   ppAddBtn.addEventListener('click', () => {
     if (!currentPdpId) return;
+    const p = PRODUCTS.find(x => x.id === currentPdpId);
+    if (!p) return;
+
+    const colorRequired = ppColorGroup.style.display !== 'none';
+    if (colorRequired && !currentPdpColor){
+      showToast('Selecione uma cor antes de continuar');
+      ppColors.classList.add('pp-swatches-alert');
+      setTimeout(() => ppColors.classList.remove('pp-swatches-alert'), 900);
+      return;
+    }
     const sizeRequired = ppSizeGroup.style.display !== 'none';
-    if (sizeRequired && ppSizeValue.textContent === 'Selecione'){
+    if (sizeRequired && !currentPdpSize){
       showToast('Selecione um tamanho antes de continuar');
       ppSizes.classList.add('pp-swatches-alert');
       setTimeout(() => ppSizes.classList.remove('pp-swatches-alert'), 900);
       return;
     }
-    const size = sizeRequired ? ppSizeValue.textContent : '';
-    addToCart(currentPdpId, { size });
+
+    const available = getAvailableStock(p, currentPdpColor, currentPdpSize);
+    if (available !== null){
+      const already = qtyInCart(p.id, currentPdpColor, currentPdpSize);
+      if (available <= 0 || already >= available){
+        showToast('Não há mais estoque disponível para essa combinação');
+        updatePdpStockNote();
+        return;
+      }
+    }
+
+    addToCart(currentPdpId, { size: currentPdpSize, color: currentPdpColor });
+    updatePdpStockNote();
     ppAddBtn.classList.add('added');
-    const original = ppAddBtn.textContent;
     ppAddBtn.textContent = 'Adicionado ✓';
-    setTimeout(() => { ppAddBtn.classList.remove('added'); ppAddBtn.textContent = original; }, 1200);
+    setTimeout(() => { ppAddBtn.classList.remove('added'); updatePdpStockNote(); }, 1200);
   });
 
   /* =========================================================
@@ -2068,6 +2212,14 @@
   function changeQty(idx, delta){
     const item = cart[idx];
     if (!item) return;
+    if (delta > 0){
+      const p = PRODUCTS.find(x => x.id === item.id);
+      const available = getAvailableStock(p, item.color, item.size);
+      if (available !== null && item.qty >= available){
+        showToast('Estoque disponível: ' + available + ' un.');
+        return;
+      }
+    }
     item.qty += delta;
     if (item.qty <= 0) cart.splice(idx, 1);
     saveCart();
@@ -2101,7 +2253,10 @@
 
     const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const waMsg = 'Olá! Quero finalizar meu pedido na MUV FITNESS:%0A' +
-      cart.map(i => `- ${i.qty}x ${i.name}${i.size ? ' (' + i.size + ')' : ''} (${brl(i.price)})`).join('%0A') +
+      cart.map(i => {
+        const variant = [i.color, i.size].filter(Boolean).join(', ');
+        return `- ${i.qty}x ${i.name}${variant ? ' (' + variant + ')' : ''} (${brl(i.price)})`;
+      }).join('%0A') +
       `%0A%0ATotal: ${brl(subtotal)}`;
 
     body.innerHTML = `
@@ -2114,7 +2269,7 @@
                 <div class="cart-row-thumb" data-goto-product="${item.id}">${item.image || ''}</div>
                 <div class="cart-row-info">
                   <h5 data-goto-product="${item.id}">${item.name}</h5>
-                  ${item.size ? `<div class="variant">${item.size}</div>` : ''}
+                  ${(item.color || item.size) ? `<div class="variant">${[item.color, item.size].filter(Boolean).join(' · ')}</div>` : ''}
                   <div class="unit-price">${brl(item.price)}</div>
                 </div>
               </div>
@@ -2292,7 +2447,7 @@
         </div>
         <div class="co-sum-info">
           <h6>${item.name}</h6>
-          ${item.size ? `<span>Tamanho: ${item.size}</span>` : ''}
+          ${(item.color || item.size) ? `<span>${[item.color, item.size].filter(Boolean).join(' · ')}</span>` : ''}
         </div>
         <div class="co-sum-price">${brl(item.price * item.qty)}</div>
       </div>

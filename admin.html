@@ -245,6 +245,34 @@ tbody tr:last-child td{border-bottom:none;}
 .pf-img-add{width:74px;height:90px;border-radius:8px;border:1.6px dashed var(--line);display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;font-weight:600;color:var(--ink-soft);cursor:pointer;flex-shrink:0;padding:4px;transition:border-color .2s ease,color .2s ease;}
 .pf-img-add:hover{border-color:var(--pink-deep);color:var(--pink-deep);}
 
+/* variants: colors, sizes, stock grade */
+.pf-variant-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pf-variant-add-row input[type="text"]{flex:1;min-width:160px;border:1.4px solid var(--line);border-radius:var(--radius-sm);padding:11px 13px;font-size:14px;color:var(--ink);background:var(--white);}
+.pf-variant-add-row input[type="text"]:focus{border-color:var(--pink-deep);outline:none;}
+.pf-variant-add-row input[type="color"]{width:42px;height:40px;padding:2px;border:1.4px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;flex-shrink:0;}
+.pf-chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.pf-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg);border:1.4px solid var(--line);border-radius:100px;padding:6px 8px 6px 12px;font-size:12.5px;font-weight:600;color:var(--ink);}
+.pf-chip .swatch{width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex-shrink:0;}
+.pf-chip button{background:rgba(35,31,29,.08);border:none;width:17px;height:17px;border-radius:50%;font-size:10px;line-height:1;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0;}
+.pf-chip button:hover{background:var(--red-bg);color:var(--red);}
+.pf-size-quick{display:flex;flex-wrap:wrap;gap:7px;}
+.pf-size-chip{border:1.4px solid var(--line);background:#fff;border-radius:100px;padding:7px 15px;font-size:12.5px;font-weight:700;color:var(--ink-soft);transition:.15s ease;}
+.pf-size-chip:hover{border-color:var(--pink-deep);}
+.pf-size-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.pf-grade-scroll{overflow-x:auto;border:1.4px solid var(--line);border-radius:var(--radius-sm);margin-top:4px;}
+.pf-grade-table{border-collapse:collapse;width:100%;font-size:12.5px;}
+.pf-grade-table th,.pf-grade-table td{padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center;white-space:nowrap;}
+.pf-grade-table tr>*:last-child{border-right:none;}
+.pf-grade-table tbody tr:last-child td{border-bottom:none;}
+.pf-grade-table th:first-child,.pf-grade-table td:first-child{text-align:left;position:sticky;left:0;background:#fff;}
+.pf-grade-table thead th{background:var(--bg);font-weight:700;color:var(--ink-soft);text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;}
+.pf-grade-table thead th:first-child{background:var(--bg);}
+.pf-grade-table input[type="number"]{width:56px;border:1.4px solid var(--line);border-radius:6px;padding:5px;text-align:center;font-size:12.5px;}
+.pf-grade-color-cell{display:flex;align-items:center;gap:7px;font-weight:600;}
+.pf-grade-color-cell .swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,.15);}
+.prod-swatch-row{display:flex;gap:4px;margin-top:5px;}
+.prod-swatch{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex-shrink:0;}
+
 /* order detail */
 .od-section{margin-bottom:18px;}
 .od-section h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:8px;font-weight:700;}
@@ -697,7 +725,7 @@ tbody tr:last-child td{border-bottom:none;}
 
 <!-- ===== PRODUCT MODAL ===== -->
 <div class="modal-overlay" id="productModalOverlay">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-head">
       <h2 id="productModalTitle">Novo produto</h2>
       <button class="modal-close" data-close="productModalOverlay">✕</button>
@@ -729,6 +757,7 @@ tbody tr:last-child td{border-bottom:none;}
           <div class="field">
             <label>Estoque (un.)</label>
             <input type="number" id="pfStock" min="0" step="1" required placeholder="0">
+            <div class="field-hint" id="pfStockHint" style="margin-top:4px;">Se cadastrar cores/tamanhos abaixo, este valor é calculado automaticamente pela grade.</div>
           </div>
           <div class="field">
             <label>SKU</label>
@@ -743,6 +772,32 @@ tbody tr:last-child td{border-bottom:none;}
               <option>Últimas peças</option>
               <option>Promoção</option>
             </select>
+          </div>
+          <div class="field full">
+            <label>Cores disponíveis</label>
+            <div class="pf-variant-add-row">
+              <input type="color" id="pfColorHex" value="#d9a3b1" title="Escolher cor">
+              <input type="text" id="pfColorName" placeholder="Nome da cor (ex: Rosa nude)">
+              <button type="button" class="btn btn-ghost btn-sm" id="pfAddColorBtn">+ Adicionar cor</button>
+            </div>
+            <div id="pfColorList" class="pf-chip-list"></div>
+            <div class="field-hint" style="margin-top:8px;">Cadastre cada cor em que este produto é vendido.</div>
+          </div>
+          <div class="field full">
+            <label>Tamanhos disponíveis</label>
+            <div class="pf-size-quick" id="pfSizeQuick"></div>
+            <div class="pf-variant-add-row" style="margin-top:10px;">
+              <input type="text" id="pfSizeCustom" placeholder="Outro tamanho (ex: 36, Único)">
+              <button type="button" class="btn btn-ghost btn-sm" id="pfAddSizeBtn">+ Adicionar</button>
+            </div>
+            <div id="pfSizeList" class="pf-chip-list"></div>
+          </div>
+          <div class="field full" id="pfGradeWrap" style="display:none;">
+            <label>Grade de estoque (por cor e tamanho)</label>
+            <div class="pf-grade-scroll">
+              <table class="pf-grade-table" id="pfGradeTable"></table>
+            </div>
+            <div class="field-hint" style="margin-top:8px;">Estoque total calculado automaticamente: <strong id="pfGradeTotal">0</strong> un.</div>
           </div>
           <div class="field full">
             <label>Descrição</label>
@@ -1331,8 +1386,12 @@ function renderProducts(){
     const stockBadge = p.stock===0
       ? '<span class="badge badge-red">Esgotado</span>'
       : (p.stock<=5 ? `<span class="badge badge-amber">${p.stock} un.</span>` : `<span class="badge badge-green">${p.stock} un.</span>`);
+    const sizesInfo = Array.isArray(p.sizes) && p.sizes.length ? ' · '+p.sizes.length+' tam.' : '';
+    const swatches = Array.isArray(p.colors) && p.colors.length
+      ? `<div class="prod-swatch-row">${p.colors.slice(0,6).map(c=>`<span class="prod-swatch" style="background:${c.hex}" title="${c.name}"></span>`).join('')}${p.colors.length>6?`<span class="cell-sub">+${p.colors.length-6}</span>`:''}</div>`
+      : '';
     return `<tr>
-      <td><div class="prod-cell">${thumb}<div><div class="cell-title">${p.name}</div><div class="cell-sub">${p.sku||'—'}${p.tag ? ' · '+p.tag : ''}</div></div></div></td>
+      <td><div class="prod-cell">${thumb}<div><div class="cell-title">${p.name}</div><div class="cell-sub">${p.sku||'—'}${p.tag ? ' · '+p.tag : ''}${sizesInfo}</div>${swatches}</div></div></td>
       <td>${categoryName(p.category)}</td>
       <td>${brl(p.price)}${p.oldPrice?`<div class="cell-sub" style="text-decoration:line-through;">${brl(p.oldPrice)}</div>`:''}</td>
       <td>${stockBadge}</td>
@@ -1381,6 +1440,129 @@ function renderProducts(){
 
 let editingProductId = null;
 let pendingImages = [];
+let pendingColors = [];   // [{name, hex}]
+let pendingSizes = [];    // ['P','M',...]
+let pendingVariants = []; // [{color, size, stock}]
+const COMMON_SIZES = ['PP','P','M','G','GG','XG','Único'];
+
+function renderPfColorList(){
+  const list = document.getElementById('pfColorList');
+  list.innerHTML = pendingColors.map((c,i)=>`
+    <span class="pf-chip"><span class="swatch" style="background:${c.hex}"></span>${c.name}<button type="button" data-i="${i}" title="Remover cor">✕</button></span>
+  `).join('');
+  list.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      pendingColors.splice(parseInt(btn.dataset.i), 1);
+      renderPfColorList();
+      renderVariantGrid();
+    });
+  });
+}
+
+function addPfColor(){
+  const nameInput = document.getElementById('pfColorName');
+  const hexInput = document.getElementById('pfColorHex');
+  const name = nameInput.value.trim();
+  if(!name){ showToast('Digite o nome da cor.'); return; }
+  if(pendingColors.some(c=>c.name.toLowerCase()===name.toLowerCase())){ showToast('Essa cor já foi adicionada.'); return; }
+  pendingColors.push({name, hex: hexInput.value});
+  nameInput.value = '';
+  renderPfColorList();
+  renderVariantGrid();
+}
+
+function renderPfSizeQuick(){
+  const wrap = document.getElementById('pfSizeQuick');
+  wrap.innerHTML = COMMON_SIZES.map(s=>`<button type="button" class="pf-size-chip ${pendingSizes.includes(s)?'active':''}" data-size="${s}">${s}</button>`).join('');
+  wrap.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>toggleSize(btn.dataset.size));
+  });
+}
+
+function renderPfSizeList(){
+  const list = document.getElementById('pfSizeList');
+  list.innerHTML = pendingSizes.map((s,i)=>`<span class="pf-chip">${s}<button type="button" data-i="${i}" title="Remover tamanho">✕</button></span>`).join('');
+  list.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      pendingSizes.splice(parseInt(btn.dataset.i), 1);
+      renderPfSizeQuick();
+      renderPfSizeList();
+      renderVariantGrid();
+    });
+  });
+}
+
+function toggleSize(s){
+  const idx = pendingSizes.indexOf(s);
+  if(idx>=0) pendingSizes.splice(idx,1); else pendingSizes.push(s);
+  renderPfSizeQuick();
+  renderPfSizeList();
+  renderVariantGrid();
+}
+
+function addPfCustomSize(){
+  const input = document.getElementById('pfSizeCustom');
+  const val = input.value.trim();
+  if(!val){ showToast('Digite um tamanho.'); return; }
+  if(pendingSizes.some(s=>s.toLowerCase()===val.toLowerCase())){ showToast('Esse tamanho já foi adicionado.'); return; }
+  pendingSizes.push(val);
+  input.value = '';
+  renderPfSizeQuick();
+  renderPfSizeList();
+  renderVariantGrid();
+}
+
+function updateGradeTotal(){
+  const total = pendingVariants.reduce((s,v)=>s+(parseInt(v.stock)||0), 0);
+  document.getElementById('pfGradeTotal').textContent = total;
+  document.getElementById('pfStock').value = total;
+}
+
+function renderVariantGrid(){
+  const wrap = document.getElementById('pfGradeWrap');
+  const stockInput = document.getElementById('pfStock');
+  const hint = document.getElementById('pfStockHint');
+  if(pendingColors.length && pendingSizes.length){
+    wrap.style.display = 'block';
+    const newVariants = [];
+    pendingColors.forEach(c=>{
+      pendingSizes.forEach(s=>{
+        const existing = pendingVariants.find(v=>v.color===c.name && v.size===s);
+        newVariants.push({color:c.name, size:s, stock: existing ? (parseInt(existing.stock)||0) : 0});
+      });
+    });
+    pendingVariants = newVariants;
+
+    let html = '<thead><tr><th>Cor / Tamanho</th>' + pendingSizes.map(s=>`<th>${s}</th>`).join('') + '</tr></thead><tbody>';
+    pendingColors.forEach(c=>{
+      html += `<tr><td><div class="pf-grade-color-cell"><span class="swatch" style="background:${c.hex}"></span>${c.name}</div></td>`;
+      pendingSizes.forEach(s=>{
+        const v = pendingVariants.find(v=>v.color===c.name && v.size===s);
+        html += `<td><input type="number" min="0" step="1" value="${v.stock}" data-color="${c.name}" data-size="${s}"></td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    document.getElementById('pfGradeTable').innerHTML = html;
+    document.getElementById('pfGradeTable').querySelectorAll('input[type="number"]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const v = pendingVariants.find(v=>v.color===inp.dataset.color && v.size===inp.dataset.size);
+        if(v) v.stock = parseInt(inp.value)||0;
+        updateGradeTotal();
+      });
+    });
+    updateGradeTotal();
+    stockInput.readOnly = true;
+    stockInput.style.background = 'var(--bg)';
+    hint.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+    pendingVariants = [];
+    stockInput.readOnly = false;
+    stockInput.style.background = '';
+    hint.style.display = 'none';
+  }
+}
 
 function renderPfImgList(){
   const list = document.getElementById('pfImgList');
@@ -1407,6 +1589,7 @@ function openProductModal(id){
   renderPfImgList();
   document.getElementById('pfActive').checked = true;
   document.getElementById('pfNovidade').checked = false;
+  document.getElementById('pfColorHex').value = '#d9a3b1';
 
   if(id){
     const p = products.find(x=>x.id===id);
@@ -1424,12 +1607,31 @@ function openProductModal(id){
     document.getElementById('pfNovidade').checked = !!p.novidade;
     pendingImages = Array.isArray(p.images) && p.images.length ? p.images.slice() : (p.image ? [p.image] : []);
     renderPfImgList();
+    pendingColors = Array.isArray(p.colors) ? p.colors.map(c=>({name:c.name, hex:c.hex||'#d9a3b1'})) : [];
+    pendingSizes = Array.isArray(p.sizes) ? p.sizes.slice() : [];
+    pendingVariants = Array.isArray(p.variants) ? p.variants.map(v=>({color:v.color, size:v.size, stock:v.stock})) : [];
   } else {
     document.getElementById('productModalTitle').textContent = 'Novo produto';
+    pendingColors = [];
+    pendingSizes = [];
+    pendingVariants = [];
   }
+  renderPfColorList();
+  renderPfSizeQuick();
+  renderPfSizeList();
+  renderVariantGrid();
   openModal('productModalOverlay');
 }
 document.getElementById('newProductBtn').addEventListener('click', ()=>openProductModal(null));
+
+document.getElementById('pfAddColorBtn').addEventListener('click', addPfColor);
+document.getElementById('pfColorName').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); addPfColor(); }
+});
+document.getElementById('pfAddSizeBtn').addEventListener('click', addPfCustomSize);
+document.getElementById('pfSizeCustom').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); addPfCustomSize(); }
+});
 
 document.getElementById('pfImgInput').addEventListener('change', function(e){
   const files = Array.from(e.target.files || []);
@@ -1453,20 +1655,27 @@ document.getElementById('pfImgInput').addEventListener('change', function(e){
 
 document.getElementById('productForm').addEventListener('submit', function(e){
   e.preventDefault();
+  const hasGrade = pendingColors.length>0 && pendingSizes.length>0;
+  const stockValue = hasGrade
+    ? pendingVariants.reduce((s,v)=>s+(parseInt(v.stock)||0), 0)
+    : (parseInt(document.getElementById('pfStock').value)||0);
   const data = {
     name: document.getElementById('pfName').value.trim(),
     category: document.getElementById('pfCategory').value,
     subcat: document.getElementById('pfSubcat').value.trim(),
     price: parseFloat(document.getElementById('pfPrice').value)||0,
     oldPrice: parseFloat(document.getElementById('pfOldPrice').value)||0,
-    stock: parseInt(document.getElementById('pfStock').value)||0,
+    stock: stockValue,
     sku: document.getElementById('pfSku').value.trim(),
     tag: document.getElementById('pfTag').value,
     description: document.getElementById('pfDescription').value.trim(),
     active: document.getElementById('pfActive').checked,
     novidade: document.getElementById('pfNovidade').checked,
     images: pendingImages.slice(),
-    image: pendingImages[0] || ''
+    image: pendingImages[0] || '',
+    colors: pendingColors.slice(),
+    sizes: pendingSizes.slice(),
+    variants: pendingVariants.slice()
   };
   if(editingProductId){
     const idx = products.findIndex(x=>x.id===editingProductId);
