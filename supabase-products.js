@@ -48,6 +48,9 @@
       novidade: !!m.novidade,
       images: imgs,
       image: imgs[0] || '',
+      colors: Array.isArray(m.colors) ? m.colors : [],
+      sizes: Array.isArray(m.sizes) ? m.sizes : [],
+      variants: Array.isArray(m.variants) ? m.variants : [],
       createdAt: r.created_at ? new Date(r.created_at).getTime() : 0
     };
   }
@@ -68,7 +71,10 @@
         subcat: p.subcat || '',
         sku: p.sku || '',
         tag: p.tag || '',
-        novidade: !!p.novidade
+        novidade: !!p.novidade,
+        colors: Array.isArray(p.colors) ? p.colors : [],
+        sizes: Array.isArray(p.sizes) ? p.sizes : [],
+        variants: Array.isArray(p.variants) ? p.variants : []
       }
     };
   }
@@ -188,6 +194,11 @@
   function formData() {
     const byId = id => document.getElementById(id);
     const images = Array.from(document.querySelectorAll('#pfImgList img')).map(x => x.getAttribute('src')).filter(Boolean);
+    // Cor, tamanho e grade de estoque são controlados pelo admin.html (arrays
+    // pendingColors/pendingSizes/pendingVariants). Ele expõe essa informação
+    // aqui antes de disparar o submit, já que este script não tem acesso
+    // direto àquelas variáveis.
+    const variantData = window.__muvVariantData || {};
     return {
       name: byId('pfName')?.value.trim() || '',
       category: byId('pfCategory')?.value || '',
@@ -200,7 +211,10 @@
       description: byId('pfDescription')?.value.trim() || '',
       active: !!byId('pfActive')?.checked,
       novidade: !!byId('pfNovidade')?.checked,
-      images
+      images,
+      colors: Array.isArray(variantData.colors) ? variantData.colors : [],
+      sizes: Array.isArray(variantData.sizes) ? variantData.sizes : [],
+      variants: Array.isArray(variantData.variants) ? variantData.variants : []
     };
   }
 

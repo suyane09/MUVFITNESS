@@ -1695,15 +1695,24 @@ document.getElementById('productForm').addEventListener('submit', function(e){
     products[idx] = Object.assign({}, products[idx], data);
     showToast('Produto atualizado.');
   } else {
-    data.id = uid('p');
+    // UUID de verdade (em vez do antigo "p_xxxx") pra bater com o ID que o
+    // supabase-products.js vai usar ao enviar esse mesmo produto pro banco —
+    // sem isso, o produto acabava duplicado (um local, outro no Supabase).
+    data.id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid('p');
     data.createdAt = Date.now();
-    if(!data.sku) data.sku = 'MUV-' + data.id.slice(-6).toUpperCase();
+    if(!data.sku) data.sku = 'MUV-' + data.id.replace(/-/g,'').slice(-6).toUpperCase();
     products.unshift(data);
     showToast('Produto cadastrado.');
   }
   LS.set(KEYS.products, products);
   closeModal('productModalOverlay');
   renderProducts(); renderDashboard();
+
+  // Repassa pro supabase-products.js (que roda em seguida, no mesmo evento de
+  // submit) qual ID usar e quais cores/tamanhos/grade foram cadastrados aqui,
+  // já que aquele script monta o produto sozinho e não teria como saber disso.
+  window.__muvEditingId = editingProductId || data.id;
+  window.__muvVariantData = { colors: data.colors, sizes: data.sizes, variants: data.variants };
 });
 
 catFilterSelect.addEventListener('change', ()=>{ prodPage=1; renderProducts(); });
