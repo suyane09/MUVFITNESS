@@ -995,7 +995,10 @@ function enterApp(){
   document.getElementById('sideAvatar').textContent = creds.user.slice(0,1).toUpperCase();
   renderAll();
 }
-if(isLoggedIn()) enterApp();
+if(isLoggedIn()){
+  try{ enterApp(); }
+  catch(err){ console.error('[MUV admin] erro ao entrar no painel:', err); }
+}
 
 document.getElementById('loginForm').addEventListener('submit', function(e){
   e.preventDefault();
@@ -1024,19 +1027,26 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
    NAVIGATION
 ========================================================= */
 const titles = {dashboard:'Dashboard', products:'Produtos', showcase:'Vitrine', orders:'Pedidos', customers:'Clientes', coupons:'Cupons', settings:'Configurações'};
+function safeRender(fn){
+  try{ fn(); }
+  catch(err){
+    console.error('[MUV admin] erro ao renderizar tela:', err);
+    showToast('Ocorreu um erro ao carregar esta tela. Veja o console para detalhes.');
+  }
+}
 function goView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.side-link').forEach(l=>l.classList.toggle('active', l.dataset.view===name));
   document.getElementById('pageTitle').textContent = titles[name] || '';
   document.getElementById('sidebar').classList.remove('open');
-  if(name==='dashboard') renderDashboard();
-  if(name==='products') renderProducts();
-  if(name==='showcase') renderShowcase();
-  if(name==='orders') renderOrders();
-  if(name==='customers') renderCustomers();
-  if(name==='coupons') renderCoupons();
-  if(name==='settings') renderSettings();
+  if(name==='dashboard') safeRender(renderDashboard);
+  if(name==='products') safeRender(renderProducts);
+  if(name==='showcase') safeRender(renderShowcase);
+  if(name==='orders') safeRender(renderOrders);
+  if(name==='customers') safeRender(renderCustomers);
+  if(name==='coupons') safeRender(renderCoupons);
+  if(name==='settings') safeRender(renderSettings);
 }
 document.querySelectorAll('.side-link').forEach(l=>{
   l.addEventListener('click', (e)=>{ e.preventDefault(); goView(l.dataset.view); });
@@ -1822,13 +1832,13 @@ document.getElementById('globalSearch').addEventListener('input', ()=>{
    INIT
 ========================================================= */
 function renderAll(){
-  renderDashboard();
-  renderProducts();
-  renderShowcase();
-  renderOrders();
-  renderCustomers();
-  renderCoupons();
-  renderSettings();
+  safeRender(renderDashboard);
+  safeRender(renderProducts);
+  safeRender(renderShowcase);
+  safeRender(renderOrders);
+  safeRender(renderCustomers);
+  safeRender(renderCoupons);
+  safeRender(renderSettings);
 }
 
 // keep dashboard counters fresh if orders change in another tab (same-origin storefront)
@@ -1843,5 +1853,7 @@ window.addEventListener('storage', function(ev){
 
 })();
 </script>
+<script src="/supabase-config.js"></script>
+<script src="/supabase-products.js"></script>
 </body>
 </html>
