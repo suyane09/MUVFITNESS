@@ -191,33 +191,6 @@
     return out;
   }
 
-  function formData() {
-    const byId = id => document.getElementById(id);
-    const images = Array.from(document.querySelectorAll('#pfImgList img')).map(x => x.getAttribute('src')).filter(Boolean);
-    // Cor, tamanho e grade de estoque são controlados pelo admin.html (arrays
-    // pendingColors/pendingSizes/pendingVariants). Ele expõe essa informação
-    // aqui antes de disparar o submit, já que este script não tem acesso
-    // direto àquelas variáveis.
-    const variantData = window.__muvVariantData || {};
-    return {
-      name: byId('pfName')?.value.trim() || '',
-      category: byId('pfCategory')?.value || '',
-      subcat: byId('pfSubcat')?.value.trim() || '',
-      price: parseFloat(byId('pfPrice')?.value) || 0,
-      oldPrice: parseFloat(byId('pfOldPrice')?.value) || 0,
-      stock: parseInt(byId('pfStock')?.value) || 0,
-      sku: byId('pfSku')?.value.trim() || '',
-      tag: byId('pfTag')?.value || '',
-      description: byId('pfDescription')?.value.trim() || '',
-      active: !!byId('pfActive')?.checked,
-      novidade: !!byId('pfNovidade')?.checked,
-      images,
-      colors: Array.isArray(variantData.colors) ? variantData.colors : [],
-      sizes: Array.isArray(variantData.sizes) ? variantData.sizes : [],
-      variants: Array.isArray(variantData.variants) ? variantData.variants : []
-    };
-  }
-
   async function saveProduct(client, data, editingId) {
     const id = editingId || crypto.randomUUID();
     if (!data.sku) data.sku = 'MUV-' + id.replace(/-/g, '').slice(-6).toUpperCase();
@@ -235,6 +208,30 @@
     setTimeout(() => location.reload(), 250);
   }
 
+  // Fila de sincronização: o admin.html chama window.MUV_SUPABASE_SAVE_PRODUCT(data, editingId)
+  // diretamente, na hora que ele mesmo salva o produto (já com cor/tamanho/grade prontos).
+  // Isso substitui o esquema antigo (dois "submit" separados torcendo pra rodar na ordem certa)
+  // por uma chamada direta e única — funciona mesmo que o cliente do Supabase ainda esteja
+  // carregando quando o formulário é enviado, porque a chamada fica na fila até ficar pronto.
+  let _adminClient = null;
+  const _saveQueue = [];
+  function _flushSaveQueue() {
+    if (!_adminClient) return;
+    while (_saveQueue.length) {
+      const item = _saveQueue.shift();
+      saveProduct(_adminClient, item.data, item.editingId).then(item.resolve, (err) => {
+        toast('Erro ao salvar produto no Supabase: ' + (err && err.message ? err.message : 'verifique o Supabase'));
+        item.reject(err);
+      });
+    }
+  }
+  window.MUV_SUPABASE_SAVE_PRODUCT = function (data, editingId) {
+    return new Promise((resolve, reject) => {
+      _saveQueue.push({ data, editingId, resolve, reject });
+      _flushSaveQueue();
+    });
+  };
+
   async function removeProduct(client, id) {
     if (!id) return;
     if (!confirm('Excluir este produto do catálogo?')) return;
@@ -251,8 +248,6 @@
     if (!form) return;
 
     document.addEventListener('click', function (e) {
-      const edit = e.target.closest('[data-edit]');
-      if (edit) window.__muvEditingId = edit.dataset.edit;
       const del = e.target.closest('[data-del]');
       if (del) {
         e.preventDefault();
@@ -261,17 +256,8 @@
       }
     }, true);
 
-    document.getElementById('newProductBtn')?.addEventListener('click', () => { window.__muvEditingId = null; }, true);
-
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const editingId = window.__muvEditingId || null;
-      saveProduct(client, formData(), editingId).catch(err => {
-        console.error(err);
-        toast('Erro ao salvar produto: ' + (err.message || 'verifique o Supabase'));
-      });
-    }, true);
+    _adminClient = client;
+    _flushSaveQueue();
 
     syncFromSupabase(client, true).catch(err => {
       console.error('[MUV Supabase sync]', err);

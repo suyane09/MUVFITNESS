@@ -1708,11 +1708,15 @@ document.getElementById('productForm').addEventListener('submit', function(e){
   closeModal('productModalOverlay');
   renderProducts(); renderDashboard();
 
-  // Repassa pro supabase-products.js (que roda em seguida, no mesmo evento de
-  // submit) qual ID usar e quais cores/tamanhos/grade foram cadastrados aqui,
-  // já que aquele script monta o produto sozinho e não teria como saber disso.
-  window.__muvEditingId = editingProductId || data.id;
-  window.__muvVariantData = { colors: data.colors, sizes: data.sizes, variants: data.variants };
+  // Envia esse mesmo produto (já com cor/tamanho/grade) pro catálogo online no
+  // Supabase, chamando diretamente a função exposta pelo supabase-products.js.
+  // Assim não depende de qual script "roda primeiro" — funciona mesmo que o
+  // Supabase ainda esteja carregando no momento em que o formulário é enviado.
+  const idForSync = editingProductId || data.id;
+  if (typeof window.MUV_SUPABASE_SAVE_PRODUCT === 'function') {
+    window.MUV_SUPABASE_SAVE_PRODUCT(Object.assign({}, data, {id: idForSync}), editingProductId || null)
+      .catch(err => console.error('[MUV Supabase] erro ao sincronizar produto:', err));
+  }
 });
 
 catFilterSelect.addEventListener('change', ()=>{ prodPage=1; renderProducts(); });
@@ -2090,7 +2094,7 @@ if(isLoggedIn()){
 
 })();
 </script>
-<script src="/supabase-config.js"></script>
-<script src="/supabase-products.js"></script>
+<script src="/supabase-config.js?v=3"></script>
+<script src="/supabase-products.js?v=3"></script>
 </body>
 </html>
