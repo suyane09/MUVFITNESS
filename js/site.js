@@ -1601,7 +1601,7 @@
     }
     searchResults.innerHTML = matches.map(p => `
       <div class="sr-item" data-goto="${p.id}" data-section="${p.section}">
-        <div class="sr-thumb"></div>
+        <div class="sr-thumb">${p.images && p.images[0] ? p.images[0] : ''}</div>
         <div>
           <h5>${p.name}</h5>
           <span>${brl(p.price)}</span>
