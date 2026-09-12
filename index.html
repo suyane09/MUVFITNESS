@@ -1493,17 +1493,25 @@
         colorDotsHtml = '<div class="prod-color-row">' + shown + moreHtml + '</div>';
       }
       return (
-        '<div class="prod-card" data-id="' + esc(p.id) + '" data-subcat="' + esc(p.subcat || '') + '" data-name="' + esc(p.name) + '" data-price="' + price.toFixed(2) + '" data-stock="' + stockNum + '" data-colors="' + colorsJson + '" data-sizes="' + sizesJson + '" data-variants="' + variantsJson + '">' +
-          '<div class="prod-thumb">' +
-            tagHtml +
-            '<div class="img-a">' + imgAHtml + '</div>' +
-            '<div class="img-b">' + imgBHtml + '</div>' +
-            extraHtml +
-          '</div>' +
-          '<h4>' + esc(p.name) + '</h4>' +
-          '<div class="price">' + oldPriceHtml + '<strong>' + esc(brl(price)) + '</strong></div>' +
-          colorDotsHtml +
-          '<span class="install">' + installHtml + '</span>' +
+        '<div class="prod-card" data-id="' + esc(p.id) +
+        '" data-category="' + esc(p.category || '') +
+        '" data-subcat="' + esc(p.subcat || '') +
+        '" data-name="' + esc(p.name) +
+        '" data-price="' + price.toFixed(2) +
+        '" data-stock="' + stockNum +
+        '" data-colors="' + colorsJson +
+        '" data-sizes="' + sizesJson +
+        '" data-variants="' + variantsJson + '">' +
+        '<div class="prod-thumb">' +
+          tagHtml +
+          '<div class="img-a">' + imgAHtml + '</div>' +
+          '<div class="img-b">' + imgBHtml + '</div>' +
+          extraHtml +
+        '</div>' +
+        '<h4>' + esc(p.name) + '</h4>' +
+        '<div class="price">' + oldPriceHtml + '<strong>' + esc(brl(price)) + '</strong></div>' +
+        colorDotsHtml +
+        '<span class="install">' + installHtml + '</span>' +
         '</div>'
       );
     }
@@ -1764,9 +1772,10 @@
     // Static/hardcoded cards without data-stock are treated as unlimited (stock = null).
     const stock = card.dataset.stock !== undefined ? (parseInt(card.dataset.stock) || 0) : null;
     return {
-      id: card.dataset.id,
-      name: card.dataset.name,
-      price: parseFloat(card.dataset.price),
+  id: card.dataset.id,
+  name: card.dataset.name,
+  category: card.dataset.category || card.closest('section')?.id || '',
+  price: parseFloat(card.dataset.price),
       oldPriceText: card.querySelector('.old')?.textContent || '',
       install: card.querySelector('.install')?.textContent || '',
       tag: card.querySelector('.tag')?.textContent || '',
@@ -2075,13 +2084,26 @@
   let activeSizes = new Set();
 
   function getCategoryBaseList(key){
-    if (key === 'todos') return PRODUCTS.filter(p => p.section !== 'bestseller');
-    const [section, subcat] = key.split(':');
-    let list = PRODUCTS.filter(p => p.section === section);
-    if (subcat) list = list.filter(p => p.subcat === subcat);
-    return list;
+  if (key === 'todos') {
+    return PRODUCTS.filter(p => p.section !== 'bestseller');
   }
 
+  const [category, subcat] = key.split(':');
+
+  let list = PRODUCTS.filter(p => {
+    const productCategory = String(p.category || p.section || '').trim().toLowerCase();
+    return productCategory === category.toLowerCase();
+  });
+
+  if (subcat) {
+    list = list.filter(p => {
+      const productSubcat = String(p.subcat || '').trim().toLowerCase();
+      return productSubcat === subcat.toLowerCase();
+    });
+  }
+
+  return list;
+}
   function catCardHTML(p){
   const images = p.images.length
     ? p.images
