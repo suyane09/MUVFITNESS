@@ -251,4 +251,10 @@
     getOrders, saveOrder,
     getAddresses, saveAddress, deleteAddress, setDefaultAddress
   };
+
+  // Começa a baixar/inicializar o cliente Supabase assim que este script
+  // roda, em vez de esperar o primeiro clique em "Entrar"/"Cadastrar".
+  // Isso evita que a pessoa sinta a demora de carregar a lib do CDN
+  // bem na hora em que está tentando se cadastrar.
+  getClient().catch(() => { /* falha aqui é silenciosa; o erro real aparece quando a ação for tentada */ });
 })();
