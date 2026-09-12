@@ -322,3 +322,18 @@ tbody tr:last-child td{border-bottom:none;}
   .form-grid{grid-template-columns:1fr;}
   .kpi-grid{grid-template-columns:1fr 1fr;}
 }
+
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:1fr;}
+  .topbar{padding:14px 16px;flex-wrap:wrap;gap:10px;}
+  .search-box input{width:100%;}
+  .view{padding:20px 16px 50px;}
+  .login-card{padding:34px 22px 28px;}
+}
+
+/* evita o zoom automático do iOS/Safari ao focar em qualquer campo com font-size < 16px */
+@media(max-width:768px){
+  input,select,textarea{
+    font-size:16px !important;
+  }
+}
