@@ -1650,16 +1650,20 @@
     if(ev.key === 'muv_showcase_cards') applyShowcaseImages();
   });
 
-  /* Imagem da seção "Sobre nós" — chave compartilhada: muv_about_image */
+  /* Imagem da seção "Sobre nós" — chave compartilhada: muv_about_image
+     (salva pelo admin via LS.set, que grava como JSON — por isso o parse abaixo) */
   function applyAboutImage(){
     try{
-      var src = localStorage.getItem('muv_about_image');
+      var raw = localStorage.getItem('muv_about_image');
       var box = document.getElementById('aboutVisual');
       if(!box) return;
+      var src = raw ? JSON.parse(raw) : '';
+      var img = box.querySelector('img');
       if(src){
-        var img = box.querySelector('img');
         if(!img){ img = document.createElement('img'); img.alt = 'MUV Fitness'; box.appendChild(img); }
         img.src = src;
+      } else if(img){
+        img.remove();
       }
     }catch(e){
       console.warn('Não foi possível carregar a imagem da seção "Sobre nós".', e);
