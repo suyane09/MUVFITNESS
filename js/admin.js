@@ -173,6 +173,9 @@ function goView(name){
   document.querySelectorAll('.side-link').forEach(l=>l.classList.toggle('active', l.dataset.view===name));
   document.getElementById('pageTitle').textContent = titles[name] || '';
   document.getElementById('sidebar').classList.remove('open');
+  // Guarda a aba atual pra poder voltar pra ela caso a página recarregue
+  // (ex.: depois de salvar um produto no Supabase, ver saveProduct em supabase-products.js).
+  sessionStorage.setItem('muv_admin_last_view', name);
   if(name==='dashboard') safeRender(renderDashboard);
   if(name==='products') safeRender(renderProducts);
   if(name==='showcase'){ safeRender(renderShowcase); safeRender(renderAboutImage); }
@@ -1275,7 +1278,13 @@ window.addEventListener('storage', function(ev){
    e funções usadas pelas telas já existem e foram inicializadas)
 ========================================================= */
 if(isLoggedIn()){
-  try{ enterApp(); }
+  try{
+    enterApp();
+    // Depois de recarregar a página (ex.: após salvar um produto), volta pra
+    // aba em que a pessoa estava, em vez de sempre cair no Dashboard.
+    const lastView = sessionStorage.getItem('muv_admin_last_view');
+    if(lastView && document.getElementById('view-'+lastView)) goView(lastView);
+  }
   catch(err){ console.error('[MUV admin] erro ao entrar no painel:', err); }
 }
 
