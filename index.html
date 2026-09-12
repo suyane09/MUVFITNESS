@@ -2195,6 +2195,13 @@
       }));
     }
 
+    // color filter (checked colors are OR'd together)
+    const activeColors = Array.from(catColorRow.querySelectorAll('.cat-color-dot.active'))
+      .map(d => normalizeSubcat(d.dataset.color));
+    if (activeColors.length){
+      list = list.filter(p => Array.isArray(p.colors) && p.colors.some(c => activeColors.includes(normalizeSubcat(c.name))));
+    }
+
     // size filter — informational only for accessories (no per-size stock data yet, so it never excludes items)
     // kept here so the UI is ready to wire up once real per-SKU stock is available
 
@@ -2263,7 +2270,10 @@
     chip.addEventListener('click', () => chip.classList.toggle('active'));
   });
   catColorRow.querySelectorAll('.cat-color-dot').forEach(dot => {
-    dot.addEventListener('click', () => dot.classList.toggle('active'));
+    dot.addEventListener('click', () => {
+      dot.classList.toggle('active');
+      applyCategoryFiltersAndSort();
+    });
   });
   catClearFilters.addEventListener('click', () => {
     resetCategoryFilters();
