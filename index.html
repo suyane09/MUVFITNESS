@@ -923,10 +923,11 @@
   </div>
 </section>
 
-<!-- 5. CATEGORY PILLS -->
-<div class="cat-pills">
-  <a href="#conjuntos-short" class="active" data-cat="conjuntos:short">Conjunto Short</a>
-  <a href="#conjuntos-calca" data-cat="conjuntos:calca">Conjunto Calça</a>
+<!-- 5. CATEGORY PILLS (filtro em vitrine, dentro da seção "Conjuntos") -->
+<div class="cat-pills" id="conjuntosPills">
+  <a href="#conjuntos" class="active" data-subcat-filter="">Conjuntos</a>
+  <a href="#conjuntos-short" data-subcat-filter="short">Conjunto Short</a>
+  <a href="#conjuntos-calca" data-subcat-filter="calca">Conjunto Calça</a>
   <a href="#blusa" data-cat="blusa">Blusa</a>
 </div>
 
@@ -2275,7 +2276,41 @@
     if (CATEGORY_LABELS[initialKey]) openCategoryPage(initialKey, { skipHistory: true });
   }
 
-  // any element with data-cat (nav, drawer, cat-pills, showcase, "Ver mais") opens the matching category page
+  // Pills da seção "Conjuntos" na home (Conjuntos / Conjunto Short / Conjunto
+  // Calça): filtram os cards da própria vitrine em vez de abrir a página de
+  // categoria — por isso usam data-subcat-filter, não data-cat.
+  (function setupConjuntosPillsFilter(){
+    const bar = document.getElementById('conjuntosPills');
+    if (!bar) return;
+    const pills = Array.from(bar.querySelectorAll('[data-subcat-filter]'));
+    const grid = document.getElementById('conjuntosGrid');
+    if (!grid || !pills.length) return;
+
+    function applyFilter(subcat){
+      const norm = normalizeSubcat(subcat);
+      grid.querySelectorAll('.prod-card').forEach(card => {
+        const show = !norm || normalizeSubcat(card.dataset.subcat) === norm;
+        card.style.display = show ? '' : 'none';
+      });
+      grid.scrollTo({ left: 0 });
+      updateCarouselButtons(grid);
+    }
+
+    pills.forEach(pill => {
+      pill.addEventListener('click', (e) => {
+        e.preventDefault();
+        pills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        applyFilter(pill.dataset.subcatFilter);
+      });
+    });
+
+    // aplica o filtro inicial (pill que já vier marcada como "active" no HTML)
+    const initialPill = pills.find(p => p.classList.contains('active')) || pills[0];
+    applyFilter(initialPill.dataset.subcatFilter);
+  })();
+
+  // any element with data-cat (nav, drawer, showcase, "Ver mais", Blusa) opens the matching category page
   document.querySelectorAll('[data-cat]').forEach(a => {
     a.addEventListener('click', (e) => {
       e.preventDefault();
