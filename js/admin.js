@@ -802,14 +802,15 @@ function openProductModal(id){
     pendingColors = Array.isArray(p.colors) ? p.colors.map(c=>({name:c.name, hex:c.hex||'#d9a3b1'})) : [];
     pendingSizes = Array.isArray(p.sizes) ? p.sizes.slice() : [];
     pendingVariants = Array.isArray(p.variants) ? p.variants.map(v=>({color:v.color, size:v.size, stock:v.stock})) : [];
+    syncSubcatVisibility();
+    document.getElementById('pfSubcat').value = p.subcat || '';
   } else {
     document.getElementById('productModalTitle').textContent = 'Novo produto';
     pendingColors = [];
     pendingSizes = [];
     pendingVariants = [];
+    syncSubcatVisibility();
   }
-  syncSubcatVisibility();
-  if (id) document.getElementById('pfSubcat').value = p.subcat || '';
   renderPfColorList();
   renderPfSizeQuick();
   renderPfSizeList();
