@@ -1094,12 +1094,7 @@
         <div class="cat-filter" data-filter="cor">
           <button type="button" class="cat-filter-head">Cor<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
           <div class="cat-filter-body">
-            <div class="cat-color-row" id="catColorRow">
-              <span class="cat-color-dot" style="background:#2b2523" data-color="Preto" title="Preto"></span>
-              <span class="cat-color-dot" style="background:#d9a3b1" data-color="Rosa" title="Rosa"></span>
-              <span class="cat-color-dot" style="background:#8a8580" data-color="Cinza" title="Cinza"></span>
-              <span class="cat-color-dot" style="background:#f0c9d3" data-color="Nude" title="Nude"></span>
-            </div>
+            <div class="cat-color-row" id="catColorRow"></div>
           </div>
         </div>
 
@@ -2226,11 +2221,46 @@
     activeSizes.clear();
   }
 
+  // Monta as bolinhas de cor do filtro com base nas cores que realmente
+  // existem nos produtos desta categoria (em vez de uma lista fixa) —
+  // assim cada categoria só mostra as cores que ela de fato tem.
+  function renderCatColorFilter(list){
+    const seen = new Map(); // nome normalizado -> {name, hex}
+    list.forEach(p => {
+      (Array.isArray(p.colors) ? p.colors : []).forEach(c => {
+        if (!c || !c.name) return;
+        const key = normalizeSubcat(c.name);
+        if (!seen.has(key)) seen.set(key, { name: c.name, hex: c.hex || '#ccc' });
+      });
+    });
+    const colors = Array.from(seen.values());
+    const filterBlock = catColorRow.closest('.cat-filter');
+
+    if (!colors.length){
+      catColorRow.innerHTML = '';
+      if (filterBlock) filterBlock.style.display = 'none';
+      return;
+    }
+
+    if (filterBlock) filterBlock.style.display = '';
+    catColorRow.innerHTML = colors.map(c =>
+      `<span class="cat-color-dot" style="background:${c.hex}" data-color="${c.name.replace(/"/g, '&quot;')}" title="${c.name.replace(/"/g, '&quot;')}"></span>`
+    ).join('');
+
+    catColorRow.querySelectorAll('.cat-color-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        dot.classList.toggle('active');
+        applyCategoryFiltersAndSort();
+      });
+    });
+  }
+
   function openCategoryPage(key, opts){
     if (!CATEGORY_LABELS[key]) return;
     currentCategoryKey = key;
     catTitle.textContent = CATEGORY_LABELS[key];
     catCrumbName.textContent = CATEGORY_LABELS[key];
+    renderCatColorFilter(getCategoryBaseList(key));
     resetCategoryFilters();
     applyCategoryFiltersAndSort();
 
@@ -2268,12 +2298,6 @@
 
   catSizeRow.querySelectorAll('.cat-size-chip').forEach(chip => {
     chip.addEventListener('click', () => chip.classList.toggle('active'));
-  });
-  catColorRow.querySelectorAll('.cat-color-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      dot.classList.toggle('active');
-      applyCategoryFiltersAndSort();
-    });
   });
   catClearFilters.addEventListener('click', () => {
     resetCategoryFilters();
