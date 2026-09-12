@@ -595,6 +595,23 @@ tbody tr:last-child td{border-bottom:none;}
             <button class="btn btn-primary btn-sm" type="button" data-showcase-save="macaquito">Salvar card</button>
           </div>
         </div>
+
+        <div class="showcase-admin-card" data-showcase-card="about">
+          <div class="showcase-admin-card-head"><h3>Sobre nós (home)</h3><span class="badge badge-gray">Imagem única</span></div>
+          <div class="showcase-admin-preview">
+            <div class="showcase-admin-preview-item"><span>Foto da seção</span><div class="showcase-admin-preview-box"><img id="aboutPreviewImg" alt="Prévia da imagem"></div></div>
+          </div>
+          <div class="showcase-admin-body">
+            <div class="showcase-upload-row">
+              <label class="showcase-upload-label">Alterar imagem<input type="file" id="aboutImageInput" accept="image/*"></label>
+            </div>
+            <div class="showcase-status" id="aboutImageStatus"></div>
+          </div>
+          <div class="showcase-admin-actions">
+            <button class="btn btn-ghost btn-sm" type="button" id="aboutImageReset">Usar ilustração original</button>
+            <button class="btn btn-primary btn-sm" type="button" id="aboutImageSave">Salvar imagem</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -742,10 +759,14 @@ tbody tr:last-child td{border-bottom:none;}
             <label>Categoria</label>
             <select id="pfCategory" required></select>
           </div>
-          <div class="field">
-            <label>Subcategoria (opcional)</label>
-            <input type="text" id="pfSubcat" placeholder="Ex: short, calça">
-            <div class="field-hint" style="margin-top:4px;">Só é usada quando a categoria é "Conjuntos". Digite exatamente <strong>short</strong> ou <strong>calca</strong> para o produto aparecer nos filtros "Conjunto Short" / "Conjunto Calça".</div>
+          <div class="field" id="pfSubcatWrap">
+            <label>Subcategoria</label>
+            <select id="pfSubcat">
+              <option value="">Nenhuma</option>
+              <option value="short">Short</option>
+              <option value="calca">Calça</option>
+            </select>
+            <div class="field-hint" style="margin-top:4px;">Só é usada quando a categoria é "Conjuntos", para o produto aparecer nos filtros "Conjunto Short" / "Conjunto Calça".</div>
           </div>
           <div class="field">
             <label>Preço (R$)</label>
@@ -1094,7 +1115,7 @@ function goView(name){
   document.getElementById('sidebar').classList.remove('open');
   if(name==='dashboard') safeRender(renderDashboard);
   if(name==='products') safeRender(renderProducts);
-  if(name==='showcase') safeRender(renderShowcase);
+  if(name==='showcase'){ safeRender(renderShowcase); safeRender(renderAboutImage); }
   if(name==='orders') safeRender(renderOrders);
   if(name==='customers') safeRender(renderCustomers);
   if(name==='coupons') safeRender(renderCoupons);
@@ -1344,12 +1365,102 @@ window.addEventListener('storage', ev=>{
 });
 
 /* =========================================================
+   IMAGEM DA SEÇÃO "SOBRE NÓS" (home)
+   Chave compartilhada: muv_about_image
+========================================================= */
+const KEY_ABOUT_IMAGE = 'muv_about_image';
+let aboutImageDraft = null;
+
+function renderAboutImage(){
+  const saved = LS.get(KEY_ABOUT_IMAGE, '');
+  const preview = document.getElementById('aboutPreviewImg');
+  const status = document.getElementById('aboutImageStatus');
+  const src = aboutImageDraft !== null ? aboutImageDraft : saved;
+  if(preview){
+    if(src){
+      preview.src = src;
+      preview.style.display='block';
+      const ph = preview.parentElement.querySelector('.placeholder');
+      if(ph) ph.style.display='none';
+    } else {
+      preview.removeAttribute('src');
+      preview.style.display='none';
+      const box = preview.parentElement;
+      let ph = box.querySelector('.placeholder');
+      if(!ph){ ph=document.createElement('div'); ph.className='placeholder'; box.appendChild(ph); }
+      ph.textContent='Ilustração original da loja';
+      ph.style.display='block';
+    }
+  }
+  if(status) status.textContent = saved ? 'Alterações salvas' : 'Usando a ilustração original';
+}
+
+const aboutImageInput = document.getElementById('aboutImageInput');
+if(aboutImageInput){
+  aboutImageInput.addEventListener('change', async e=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    try{
+      aboutImageDraft = await compressShowcaseImage(file);
+      renderAboutImage();
+      const status = document.getElementById('aboutImageStatus');
+      if(status) status.textContent = 'Imagem selecionada — clique em "Salvar imagem".';
+    }catch(err){
+      showToast('Não foi possível carregar essa imagem.');
+    }
+    e.target.value = '';
+  });
+}
+
+const aboutImageSaveBtn = document.getElementById('aboutImageSave');
+if(aboutImageSaveBtn){
+  aboutImageSaveBtn.addEventListener('click', ()=>{
+    if(aboutImageDraft !== null){
+      LS.set(KEY_ABOUT_IMAGE, aboutImageDraft);
+      aboutImageDraft = null;
+    }
+    renderAboutImage();
+    showToast('Imagem da seção "Sobre nós" atualizada.');
+  });
+}
+
+const aboutImageResetBtn = document.getElementById('aboutImageReset');
+if(aboutImageResetBtn){
+  aboutImageResetBtn.addEventListener('click', ()=>{
+    askConfirm('Usar a ilustração original?', 'A imagem personalizada será removida e a loja voltará a usar o desenho que já está no código.', ()=>{
+      aboutImageDraft = null;
+      LS.set(KEY_ABOUT_IMAGE, '');
+      renderAboutImage();
+      showToast('Ilustração original restaurada.');
+    });
+  });
+}
+
+window.addEventListener('storage', ev=>{
+  if(ev.key === KEY_ABOUT_IMAGE){
+    if(document.getElementById('view-showcase').classList.contains('active')) renderAboutImage();
+  }
+});
+
+/* =========================================================
    PRODUCTS
 ========================================================= */
 const categorySelect = document.getElementById('pfCategory');
 categorySelect.innerHTML = CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
 const catFilterSelect = document.getElementById('prodCategoryFilter');
 catFilterSelect.innerHTML += CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+
+// Subcategoria (short/calça) só faz sentido para a categoria "Conjuntos".
+// Escondemos o campo pras outras categorias e zeramos o valor, pra não
+// sobrar um subcat "fantasma" salvo num produto de outra categoria.
+const pfSubcatWrap = document.getElementById('pfSubcatWrap');
+const pfSubcatSelect = document.getElementById('pfSubcat');
+function syncSubcatVisibility(){
+  const show = categorySelect.value === 'conjuntos';
+  pfSubcatWrap.style.display = show ? '' : 'none';
+  if (!show) pfSubcatSelect.value = '';
+}
+categorySelect.addEventListener('change', syncSubcatVisibility);
 
 let prodPage = 1;
 const PROD_PAGE_SIZE = 8;
@@ -1605,7 +1716,6 @@ function openProductModal(id){
     document.getElementById('productModalTitle').textContent = 'Editar produto';
     document.getElementById('pfName').value = p.name;
     document.getElementById('pfCategory').value = p.category;
-    document.getElementById('pfSubcat').value = p.subcat||'';
     document.getElementById('pfPrice').value = p.price;
     document.getElementById('pfOldPrice').value = p.oldPrice||'';
     document.getElementById('pfStock').value = p.stock;
@@ -1625,6 +1735,8 @@ function openProductModal(id){
     pendingSizes = [];
     pendingVariants = [];
   }
+  syncSubcatVisibility();
+  if (id) document.getElementById('pfSubcat').value = p.subcat || '';
   renderPfColorList();
   renderPfSizeQuick();
   renderPfSizeList();
@@ -2066,6 +2178,7 @@ function renderAll(){
   safeRender(renderDashboard);
   safeRender(renderProducts);
   safeRender(renderShowcase);
+  safeRender(renderAboutImage);
   safeRender(renderOrders);
   safeRender(renderCustomers);
   safeRender(renderCoupons);
