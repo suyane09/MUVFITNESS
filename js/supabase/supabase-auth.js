@@ -172,7 +172,10 @@
     const client = await getClient();
     const { data: userData } = await client.auth.getUser();
     const row = {
-      order_number: orderNumber(),
+      // Se o pedido já veio com um número gerado pelo /api/checkout (fluxo
+      // com pagamento via Mercado Pago), usa o mesmo — é por ele que o
+      // webhook encontra e atualiza este pedido depois.
+      order_number: order.orderNumber || orderNumber(),
       user_id: userData && userData.user ? userData.user.id : null,
       email: order.email,
       status: 'Pagamento pendente',

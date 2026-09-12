@@ -1323,16 +1323,6 @@
     document.querySelector('input[name="coPay"][value="pix"]').dispatchEvent(new Event('change'));
   });
 
-  // simple card number / expiry masks
-  document.getElementById('coCardNumber').addEventListener('input', (e) => {
-    let v = e.target.value.replace(/\D/g, '').slice(0, 16);
-    e.target.value = v.replace(/(.{4})/g, '$1 ').trim();
-  });
-  document.getElementById('coCardExpiry').addEventListener('input', (e) => {
-    let v = e.target.value.replace(/\D/g, '').slice(0, 4);
-    if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
-    e.target.value = v;
-  });
   document.getElementById('coPhone').addEventListener('input', (e) => {
     let v = e.target.value.replace(/\D/g, '').slice(0, 11);
     if (v.length > 6) v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
@@ -1490,10 +1480,16 @@
         if (!data.init_point) {
           throw new Error(data.error || 'Não foi possível gerar o pagamento.');
         }
+        // Usa o mesmo número de pedido gerado no backend (/api/checkout) como
+        // external_reference no Mercado Pago, pra o webhook conseguir casar
+        // o pagamento com o pedido certo no Supabase.
+        order.orderNumber = data.order_number;
         await saveOrder(order);
-        cart = [];
-        saveCart();
-        // Redireciona o cliente para o checkout do Mercado Pago (Pix, cartão, etc.)
+        // Não limpa o carrinho aqui: o pagamento ainda não foi confirmado.
+        // Isso só acontece quando o cliente volta com "?status=success"
+        // (ver checkPaymentReturn logo abaixo) — assim, se ela cancelar ou
+        // o pagamento for recusado no Mercado Pago, o carrinho continua
+        // intacto pra tentar de novo.
         window.location.href = data.init_point;
       })
       .catch(err => {
@@ -1533,6 +1529,37 @@
   if (location.hash === '#checkout' && cart.length > 0){
     openCheckoutPage();
   }
+
+  /* =========================================================
+     RETORNO DO MERCADO PAGO (após o pagamento)
+     -----------------------------------------------------
+     O Mercado Pago devolve o cliente pra cá com ?status=success,
+     ?status=failure ou ?status=pending (ver back_urls em
+     /api/checkout.js). O status real e definitivo do pedido é
+     sempre o que o webhook grava no Supabase — isso aqui é só
+     pra dar um retorno visual imediato pra pessoa.
+  ========================================================= */
+  (function checkPaymentReturn(){
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    if (!status) return;
+
+    if (status === 'success') {
+      cart = [];
+      saveCart();
+      showToast('Pagamento aprovado! Seu pedido foi confirmado.');
+    } else if (status === 'pending') {
+      cart = [];
+      saveCart();
+      showToast('Pagamento em análise. Avisaremos assim que for confirmado.');
+    } else if (status === 'failure') {
+      showToast('Pagamento não aprovado. Seu carrinho continua salvo para tentar novamente.');
+    }
+
+    // limpa os parâmetros da URL pra não reaplicar isso num F5
+    const cleanUrl = location.pathname + location.hash;
+    history.replaceState({}, '', cleanUrl);
+  })();
 
   /* =========================================================
      SEARCH

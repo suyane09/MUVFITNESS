@@ -608,32 +608,10 @@
                   <span class="co-card-badges"><span>VISA</span><span>MASTER</span><span>ELO</span></span>
                 </label>
                 <div class="co-pay-body active" id="coPayCardBody">
-                  <div class="co-field">
-                    <label for="coCardNumber">Número do cartão</label>
-                    <input type="text" id="coCardNumber" inputmode="numeric" placeholder="0000 0000 0000 0000">
+                  <div class="co-pix-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                    Você vai inserir os dados do cartão (número, validade, CVV e parcelamento) na próxima etapa, direto no ambiente seguro do Mercado Pago.
                   </div>
-                  <div class="co-row">
-                    <div class="co-field">
-                      <label for="coCardExpiry">Data de vencimento (MM/AA)</label>
-                      <input type="text" id="coCardExpiry" placeholder="MM/AA">
-                    </div>
-                    <div class="co-field">
-                      <label for="coCardCvv">Código de segurança</label>
-                      <input type="text" id="coCardCvv" inputmode="numeric" maxlength="4" placeholder="CVV">
-                    </div>
-                  </div>
-                  <div class="co-field">
-                    <label for="coCardName">Nome no cartão</label>
-                    <input type="text" id="coCardName">
-                  </div>
-                  <div class="co-field">
-                    <label for="coInstallments">Parcelamento</label>
-                    <select id="coInstallments"></select>
-                  </div>
-                  <label class="co-check">
-                    <input type="checkbox" id="coBillingSame" checked>
-                    Usar o endereço de entrega como endereço de faturamento
-                  </label>
                 </div>
               </div>
 
@@ -691,7 +669,7 @@
     <div class="co-success" id="coSuccess">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
       <h2>Pedido recebido!</h2>
-      <p id="coSuccessMsg">Assim que a integração de pagamento estiver ativa, você receberá a confirmação automaticamente por e-mail.</p>
+      <p id="coSuccessMsg">Assim que o pagamento for confirmado pelo Mercado Pago, você recebe a atualização automaticamente em "Meus pedidos".</p>
       <a href="#" class="btn-pill" id="coBackHome">Voltar à loja</a>
     </div>
 
