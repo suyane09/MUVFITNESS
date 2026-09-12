@@ -1342,6 +1342,9 @@ document.querySelectorAll('[data-showcase-save]').forEach(btn=>{
     LS.set(KEYS.showcaseCards, showcaseCards);
     renderShowcase();
     showToast('Card da vitrine atualizado.');
+    if(window.MUV_SUPABASE_SAVE_SITE_SETTING){
+      window.MUV_SUPABASE_SAVE_SITE_SETTING('showcase_cards', showcaseCards).catch(()=>{});
+    }
   });
 });
 
@@ -1353,6 +1356,9 @@ document.querySelectorAll('[data-showcase-reset]').forEach(btn=>{
       LS.set(KEYS.showcaseCards, showcaseCards);
       renderShowcase();
       showToast('Imagens originais restauradas.');
+      if(window.MUV_SUPABASE_SAVE_SITE_SETTING){
+        window.MUV_SUPABASE_SAVE_SITE_SETTING('showcase_cards', showcaseCards).catch(()=>{});
+      }
     });
   });
 });
@@ -1417,7 +1423,11 @@ if(aboutImageSaveBtn){
   aboutImageSaveBtn.addEventListener('click', ()=>{
     if(aboutImageDraft !== null){
       LS.set(KEY_ABOUT_IMAGE, aboutImageDraft);
+      const toSync = aboutImageDraft;
       aboutImageDraft = null;
+      if(window.MUV_SUPABASE_SAVE_SITE_SETTING){
+        window.MUV_SUPABASE_SAVE_SITE_SETTING('about_image', toSync).catch(()=>{});
+      }
     }
     renderAboutImage();
     showToast('Imagem da seção "Sobre nós" atualizada.');
@@ -1432,6 +1442,9 @@ if(aboutImageResetBtn){
       LS.set(KEY_ABOUT_IMAGE, '');
       renderAboutImage();
       showToast('Ilustração original restaurada.');
+      if(window.MUV_SUPABASE_SAVE_SITE_SETTING){
+        window.MUV_SUPABASE_SAVE_SITE_SETTING('about_image', '').catch(()=>{});
+      }
     });
   });
 }
@@ -2209,7 +2222,9 @@ if(isLoggedIn()){
 </script>
 <script src="/supabase-config.js?v=3"></script>
 <script src="/supabase-products.js?v=3"></script>
+<script src="/supabase-site-settings.js?v=1"></script>
 <script src="/supabase-config.js"></script>
 <script src="/supabase-products.js"></script>
+<script src="/supabase-site-settings.js"></script>
 </body>
 </html>
