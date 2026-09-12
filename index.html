@@ -2932,11 +2932,11 @@
       body: JSON.stringify(order)
     })
       .then(r => r.json())
-      .then(data => {
+      .then(async (data) => {
         if (!data.init_point) {
           throw new Error(data.error || 'Não foi possível gerar o pagamento.');
         }
-        saveOrder(order);
+        await saveOrder(order);
         cart = [];
         saveCart();
         // Redireciona o cliente para o checkout do Mercado Pago (Pix, cartão, etc.)
@@ -2954,18 +2954,25 @@
 
   /* =========================================================
      ORDERS HISTORY (Meus pedidos)
+     -----------------------------------------------------
+     O pedido é gravado no Supabase (tabela `orders`). Se a
+     cliente estiver logada, ele fica vinculado à conta dela
+     e aparece em "Meus pedidos" em qualquer dispositivo. Se
+     for checkout como visitante (sem login), o pedido é salvo
+     mesmo assim, mas só passa a aparecer em "Meus pedidos"
+     depois que ela criar conta/logar com o mesmo e-mail e
+     falarmos com o suporte, já que por segurança (RLS) pedidos
+     avulsos sem usuário não ficam visíveis a ninguém pelo app.
   ========================================================= */
-  function saveOrder(order){
-    const orders = JSON.parse(localStorage.getItem('muv_orders') || '[]');
-    orders.unshift({
-      id: 'MUV' + Date.now().toString().slice(-8),
-      date: new Date().toISOString(),
-      status: 'Pagamento pendente',
-      email: order.email,
-      items: order.items,
-      total: order.total
-    });
-    localStorage.setItem('muv_orders', JSON.stringify(orders));
+  async function saveOrder(order){
+    try {
+      const auth = await waitForAuth();
+      await auth.saveOrder(order);
+    } catch (err){
+      console.error('[MUV Auth] erro ao salvar pedido no Supabase:', err);
+      // Não bloqueia o checkout: o pagamento já foi criado no Mercado Pago,
+      // então o cliente segue para lá mesmo que o registro do pedido falhe.
+    }
   }
 
   // open directly on checkout if the page is loaded with #checkout in the URL
@@ -3049,61 +3056,129 @@
     formSignup.classList.add('active'); formLogin.classList.remove('active');
   });
 
-  function setLoggedUser(name, email){
-    localStorage.setItem('muv_user', JSON.stringify({ name, email }));
-    renderAccount();
+  // Estado do usuário logado (preenchido via Supabase Auth em muv_current_user)
+  window.muv_current_user = null;
+
+  function waitForAuth(){
+    return new Promise((resolve) => {
+      (function check(){
+        if (window.MUV_AUTH) return resolve(window.MUV_AUTH);
+        setTimeout(check, 50);
+      })();
+    });
   }
 
-  function renderAccount(){
-    const raw = localStorage.getItem('muv_user');
-    if (raw){
-      const user = JSON.parse(raw);
+  function setFormBusy(form, busy){
+    const btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+    if (busy){
+      btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Aguarde...';
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+    }
+  }
+
+  async function renderAccount(){
+    const user = window.muv_current_user;
+    if (user){
       accGuest.style.display = 'none';
       accLogged.classList.add('active');
-      document.getElementById('accName').textContent = user.name;
+      let name = (user.user_metadata && user.user_metadata.name) || user.email.split('@')[0];
+      try {
+        const profile = await (await waitForAuth()).getProfile();
+        if (profile && profile.name) name = profile.name;
+      } catch (e) { /* mantém o fallback */ }
+      document.getElementById('accName').textContent = name;
       document.getElementById('accEmail').textContent = user.email;
-      document.getElementById('accAvatar').textContent = user.name.charAt(0).toUpperCase();
+      document.getElementById('accAvatar').textContent = name.charAt(0).toUpperCase();
     } else {
       accGuest.style.display = 'block';
       accLogged.classList.remove('active');
     }
   }
 
-  formLogin.addEventListener('submit', (e) => {
+  formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
     const [emailInput, passInput] = formLogin.querySelectorAll('input');
     if (!emailInput.value || passInput.value.length < 4){
+      loginError.textContent = 'E-mail ou senha inválidos.';
       loginError.style.display = 'block';
       return;
     }
     loginError.style.display = 'none';
-    const name = emailInput.value.split('@')[0];
-    setLoggedUser(name.charAt(0).toUpperCase() + name.slice(1), emailInput.value);
-    showToast('Login realizado com sucesso!');
+    setFormBusy(formLogin, true);
+    try {
+      const auth = await waitForAuth();
+      await auth.signIn({ email: emailInput.value.trim(), password: passInput.value });
+      showToast('Login realizado com sucesso!');
+      formLogin.reset();
+    } catch (err){
+      console.error('[MUV Auth] erro no login:', err);
+      loginError.textContent = 'E-mail ou senha inválidos.';
+      loginError.style.display = 'block';
+    } finally {
+      setFormBusy(formLogin, false);
+    }
   });
 
-  formSignup.addEventListener('submit', (e) => {
+  formSignup.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const [nameInput, emailInput] = formSignup.querySelectorAll('input');
-    setLoggedUser(nameInput.value, emailInput.value);
-    showToast('Conta criada com sucesso! Bem-vinda, ' + nameInput.value.split(' ')[0] + '.');
+    const [nameInput, emailInput, passInput] = formSignup.querySelectorAll('input');
+    if (!nameInput.value.trim() || !emailInput.value.trim() || passInput.value.length < 4){
+      showToast('Preencha nome, e-mail e uma senha com 4+ caracteres.');
+      return;
+    }
+    setFormBusy(formSignup, true);
+    try {
+      const auth = await waitForAuth();
+      const { data, session } = (await auth.signUp({
+        name: nameInput.value.trim(),
+        email: emailInput.value.trim(),
+        password: passInput.value
+      })) || {};
+      if (data && data.session){
+        showToast('Conta criada com sucesso! Bem-vinda, ' + nameInput.value.trim().split(' ')[0] + '.');
+      } else {
+        showToast('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+      }
+      formSignup.reset();
+    } catch (err){
+      console.error('[MUV Auth] erro no cadastro:', err);
+      showToast('Não foi possível criar a conta: ' + (err.message || 'tente novamente.'));
+    } finally {
+      setFormBusy(formSignup, false);
+    }
   });
 
-  document.getElementById('accLogoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('muv_user');
-    renderAccount();
-    showToast('Você saiu da sua conta.');
+  document.getElementById('accLogoutBtn').addEventListener('click', async () => {
+    try {
+      const auth = await waitForAuth();
+      await auth.signOut();
+      showToast('Você saiu da sua conta.');
+    } catch (err){
+      console.error('[MUV Auth] erro ao sair:', err);
+    }
   });
 
   document.getElementById('accountOpen').addEventListener('click', () => openDrawer(accountDrawer));
   document.getElementById('accountClose').addEventListener('click', closeDrawers);
 
-  renderAccount();
+  // Sincroniza a UI toda vez que o estado de login muda (login, logout,
+  // sessão restaurada ao recarregar a página, etc.)
+  waitForAuth().then(auth => {
+    auth.onAuthChange((user) => {
+      window.muv_current_user = user;
+      renderAccount();
+    });
+  });
 
   /* =========================================================
      "ESQUECI MINHA SENHA"
   ========================================================= */
-  document.getElementById('forgotPasswordLink').addEventListener('click', () => {
+  document.getElementById('forgotPasswordLink').addEventListener('click', async () => {
     const emailInput = formLogin.querySelector('input[type="email"]');
     const email = emailInput && emailInput.value.trim();
     if (!email){
@@ -3111,7 +3186,14 @@
       emailInput.focus();
       return;
     }
-    showToast('Enviamos um link de redefinição de senha para ' + email + '.');
+    try {
+      const auth = await waitForAuth();
+      await auth.resetPassword(email);
+      showToast('Enviamos um link de redefinição de senha para ' + email + '.');
+    } catch (err){
+      console.error('[MUV Auth] erro ao recuperar senha:', err);
+      showToast('Não foi possível enviar o e-mail de recuperação agora.');
+    }
   });
 
   /* =========================================================
@@ -3130,27 +3212,30 @@
   }
   document.querySelectorAll('[data-back-menu]').forEach(btn => btn.addEventListener('click', backToAccMenu));
 
-  function currentUserEmail(){
-    const raw = localStorage.getItem('muv_user');
-    return raw ? JSON.parse(raw).email : null;
-  }
-
   // ----- Meus pedidos -----
-  function renderOrders(){
-    const email = currentUserEmail();
-    const all = JSON.parse(localStorage.getItem('muv_orders') || '[]');
-    const orders = email ? all.filter(o => o.email === email) : all;
+  async function renderOrders(){
     const list = document.getElementById('ordersList');
+    list.innerHTML = '<div class="acc-empty">Carregando seus pedidos...</div>';
+    let orders = [];
+    try {
+      const auth = await waitForAuth();
+      orders = await auth.getOrders();
+    } catch (err){
+      console.error('[MUV Auth] erro ao carregar pedidos:', err);
+      list.innerHTML = '<div class="acc-empty">Não foi possível carregar seus pedidos agora.</div>';
+      return;
+    }
     if (orders.length === 0){
       list.innerHTML = '<div class="acc-empty">Você ainda não fez nenhum pedido.<br>Quando finalizar uma compra, ela aparecerá aqui.</div>';
       return;
     }
     list.innerHTML = orders.map(o => {
-      const itemsTxt = o.items.map(it => (it.qty || 1) + 'x ' + it.name).join(', ');
-      const dateTxt = new Date(o.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
+      const items = Array.isArray(o.items) ? o.items : [];
+      const itemsTxt = items.map(it => (it.qty || 1) + 'x ' + it.name).join(', ');
+      const dateTxt = new Date(o.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
       return `
         <div class="order-card">
-          <div class="oc-top"><span class="oc-id">#${o.id}</span><span class="oc-date">${dateTxt}</span></div>
+          <div class="oc-top"><span class="oc-id">#${o.order_number}</span><span class="oc-date">${dateTxt}</span></div>
           <span class="oc-status">${o.status}</span>
           <div class="oc-items">${itemsTxt}</div>
           <div class="oc-total">${brl(o.total)}</div>
@@ -3164,36 +3249,53 @@
   });
 
   // ----- Meus dados -----
-  document.getElementById('menuData').addEventListener('click', (e) => {
+  document.getElementById('menuData').addEventListener('click', async (e) => {
     e.preventDefault();
-    const raw = localStorage.getItem('muv_user');
-    const user = raw ? JSON.parse(raw) : { name:'', email:'', phone:'' };
-    document.getElementById('accDataName').value = user.name || '';
-    document.getElementById('accDataEmail').value = user.email || '';
-    document.getElementById('accDataPhone').value = user.phone || '';
     showAccSub(document.getElementById('accData'));
+    try {
+      const auth = await waitForAuth();
+      const user = (await auth.getProfile()) || { name:'', email:'', phone:'' };
+      document.getElementById('accDataName').value = user.name || '';
+      document.getElementById('accDataEmail').value = user.email || '';
+      document.getElementById('accDataPhone').value = user.phone || '';
+    } catch (err){
+      console.error('[MUV Auth] erro ao carregar dados:', err);
+    }
   });
-  document.getElementById('formAccData').addEventListener('submit', (e) => {
+  document.getElementById('formAccData').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('accDataName').value.trim();
     const email = document.getElementById('accDataEmail').value.trim();
     const phone = document.getElementById('accDataPhone').value.trim();
     if (!name || !email) return;
-    localStorage.setItem('muv_user', JSON.stringify({ name, email, phone }));
-    renderAccount();
-    showToast('Dados atualizados com sucesso!');
-    backToAccMenu();
+    try {
+      const auth = await waitForAuth();
+      await auth.updateProfile({ name, email, phone });
+      await renderAccount();
+      showToast('Dados atualizados com sucesso!');
+      backToAccMenu();
+    } catch (err){
+      console.error('[MUV Auth] erro ao salvar dados:', err);
+      showToast('Não foi possível salvar seus dados agora.');
+    }
   });
 
   // ----- Endereços -----
-  function getAddresses(){ return JSON.parse(localStorage.getItem('muv_addresses') || '[]'); }
-  function saveAddresses(list){ localStorage.setItem('muv_addresses', JSON.stringify(list)); }
+  async function getAddresses(){
+    try {
+      const auth = await waitForAuth();
+      return await auth.getAddresses();
+    } catch (err){
+      console.error('[MUV Auth] erro ao carregar endereços:', err);
+      return [];
+    }
+  }
 
   const formAddress = document.getElementById('formAddress');
   let editingAddressId = null;
 
-  function renderAddresses(){
-    const list = getAddresses();
+  async function renderAddresses(){
+    const list = await getAddresses();
     const el = document.getElementById('addressesList');
     if (list.length === 0){
       el.innerHTML = '<div class="acc-empty">Nenhum endereço cadastrado ainda.</div>';
@@ -3201,11 +3303,11 @@
     }
     el.innerHTML = list.map(a => `
       <div class="addr-card">
-        <div class="ac-label">${a.label}${a.isDefault ? '<span class="ac-default">Padrão</span>' : ''}</div>
+        <div class="ac-label">${a.label || ''}${a.is_default ? '<span class="ac-default">Padrão</span>' : ''}</div>
         <div class="ac-text">${a.street}, ${a.number}${a.complement ? ' - ' + a.complement : ''}<br>${a.neighborhood} — ${a.city}/${a.state}<br>CEP ${a.cep}</div>
         <div class="ac-actions">
           <button type="button" data-edit="${a.id}">Editar</button>
-          ${!a.isDefault ? `<button type="button" data-default="${a.id}">Tornar padrão</button>` : ''}
+          ${!a.is_default ? `<button type="button" data-default="${a.id}">Tornar padrão</button>` : ''}
           <button type="button" data-delete="${a.id}">Excluir</button>
         </div>
       </div>`).join('');
@@ -3233,45 +3335,54 @@
   });
   document.getElementById('cancelAddressForm').addEventListener('click', resetAddressForm);
 
-  document.getElementById('addressesList').addEventListener('click', (e) => {
+  document.getElementById('addressesList').addEventListener('click', async (e) => {
     const editBtn = e.target.closest('[data-edit]');
     const defaultBtn = e.target.closest('[data-default]');
     const delBtn = e.target.closest('[data-delete]');
-    const list = getAddresses();
+    if (!editBtn && !defaultBtn && !delBtn) return;
+
+    const list = await getAddresses();
+    const auth = await waitForAuth();
 
     if (editBtn){
       const a = list.find(x => x.id === editBtn.dataset.edit);
       if (!a) return;
       editingAddressId = a.id;
-      document.getElementById('addrLabel').value = a.label;
-      document.getElementById('addrCep').value = a.cep;
-      document.getElementById('addrStreet').value = a.street;
-      document.getElementById('addrNumber').value = a.number;
+      document.getElementById('addrLabel').value = a.label || '';
+      document.getElementById('addrCep').value = a.cep || '';
+      document.getElementById('addrStreet').value = a.street || '';
+      document.getElementById('addrNumber').value = a.number || '';
       document.getElementById('addrComplement').value = a.complement || '';
-      document.getElementById('addrNeighborhood').value = a.neighborhood;
-      document.getElementById('addrCity').value = a.city;
-      document.getElementById('addrState').value = a.state;
+      document.getElementById('addrNeighborhood').value = a.neighborhood || '';
+      document.getElementById('addrCity').value = a.city || '';
+      document.getElementById('addrState').value = a.state || '';
       formAddress.style.display = 'flex';
       document.getElementById('addAddressBtn').style.display = 'none';
     }
     if (defaultBtn){
-      list.forEach(a => a.isDefault = (a.id === defaultBtn.dataset.default));
-      saveAddresses(list);
-      renderAddresses();
-      showToast('Endereço padrão atualizado.');
+      try {
+        await auth.setDefaultAddress(defaultBtn.dataset.default);
+        await renderAddresses();
+        showToast('Endereço padrão atualizado.');
+      } catch (err){
+        console.error('[MUV Auth] erro ao definir padrão:', err);
+        showToast('Não foi possível atualizar o endereço padrão.');
+      }
     }
     if (delBtn){
-      const filtered = list.filter(a => a.id !== delBtn.dataset.delete);
-      if (filtered.length && !filtered.some(a => a.isDefault)) filtered[0].isDefault = true;
-      saveAddresses(filtered);
-      renderAddresses();
-      showToast('Endereço removido.');
+      try {
+        await auth.deleteAddress(delBtn.dataset.delete);
+        await renderAddresses();
+        showToast('Endereço removido.');
+      } catch (err){
+        console.error('[MUV Auth] erro ao excluir endereço:', err);
+        showToast('Não foi possível excluir o endereço.');
+      }
     }
   });
 
-  formAddress.addEventListener('submit', (e) => {
+  formAddress.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const list = getAddresses();
     const data = {
       label: document.getElementById('addrLabel').value.trim(),
       cep: document.getElementById('addrCep').value.trim(),
@@ -3282,18 +3393,16 @@
       city: document.getElementById('addrCity').value.trim(),
       state: document.getElementById('addrState').value.trim()
     };
-    if (editingAddressId){
-      const idx = list.findIndex(a => a.id === editingAddressId);
-      if (idx > -1) list[idx] = { ...list[idx], ...data };
-    } else {
-      data.id = 'addr_' + Date.now();
-      data.isDefault = list.length === 0;
-      list.push(data);
+    try {
+      const auth = await waitForAuth();
+      await auth.saveAddress(data, editingAddressId || undefined);
+      await renderAddresses();
+      resetAddressForm();
+      showToast('Endereço salvo com sucesso!');
+    } catch (err){
+      console.error('[MUV Auth] erro ao salvar endereço:', err);
+      showToast('Não foi possível salvar o endereço agora.');
     }
-    saveAddresses(list);
-    renderAddresses();
-    resetAddressForm();
-    showToast('Endereço salvo com sucesso!');
   });
 
   /* =========================================================
@@ -3327,6 +3436,7 @@
 </script>
 
 <script src="/supabase-config.js?v=3"></script>
+<script src="/supabase-auth.js?v=1"></script>
 <script src="/supabase-products.js?v=3"></script>
 <script src="/supabase-site-settings.js?v=1"></script>
 <script src="/supabase-config.js"></script>
