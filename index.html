@@ -2074,11 +2074,22 @@
   let currentCategoryKey = null;
   let activeSizes = new Set();
 
+  // Normaliza o texto do subcat antes de comparar: tira espaços, acentos
+  // e diferenças de maiúsculas/minúsculas, para que "Short", " short ",
+  // "Calça" ou "calca" sejam tratados como o mesmo valor.
+  function normalizeSubcat(s){
+    return String(s || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
   function getCategoryBaseList(key){
     if (key === 'todos') return PRODUCTS.filter(p => p.section !== 'bestseller');
     const [section, subcat] = key.split(':');
     let list = PRODUCTS.filter(p => p.section === section);
-    if (subcat) list = list.filter(p => p.subcat === subcat);
+    if (subcat) list = list.filter(p => normalizeSubcat(p.subcat) === normalizeSubcat(subcat));
     return list;
   }
 
