@@ -25,7 +25,62 @@
 
    Requer a coluna `payment_id` na tabela `orders` (text, opcional):
      alter table orders add column if not exists payment_id text;
+
+   E-mail de confirmação (Brevo):
+     Pra Pix, o pagamento só é aprovado quando a cliente paga o QR Code —
+     por isso é AQUI (e não em process-payment.js) que mandamos o e-mail de
+     confirmação nesse caso. Pra cartão, o e-mail já foi enviado na hora
+     pelo process-payment.js, então aqui a gente ignora cartão pra não
+     mandar duas vezes.
+     Variáveis de ambiente (além de SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+     acima):
+       BREVO_API_KEY      -> mesma API key usada em process-payment.js
+       BREVO_SENDER_EMAIL -> mesmo e-mail remetente verificado no Brevo
 */
+
+async function sendOrderConfirmationEmail(order) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!apiKey || !senderEmail || !order || !order.email) return;
+
+  const itemsHtml = (order.items || [])
+    .map(item => `<tr>
+        <td style="padding:6px 0;">${item.qty}x ${item.name}${item.color || item.size ? ` (${[item.color, item.size].filter(Boolean).join(' · ')})` : ''}</td>
+        <td style="padding:6px 0;text-align:right;">R$ ${(item.price * item.qty).toFixed(2).replace('.', ',')}</td>
+      </tr>`)
+    .join('');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
+      <p>Recebemos a confirmação do seu pagamento via Pix do pedido <strong>${order.order_number || ''}</strong>!</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${itemsHtml}</table>
+      <p><strong>Total: R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</strong></p>
+      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
+    </div>`;
+
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'api-key': apiKey
+      },
+      body: JSON.stringify({
+        sender: { name: 'MUV FITNESS', email: senderEmail },
+        to: [{ email: order.email }],
+        subject: `Pedido ${order.order_number || ''} confirmado - MUV FITNESS`,
+        htmlContent: html
+      })
+    });
+    if (!r.ok) {
+      console.error('[MUV e-mail] erro ao enviar confirmação (pix):', await r.text());
+    }
+  } catch (err) {
+    console.error('[MUV e-mail] erro inesperado ao enviar confirmação (pix):', err);
+  }
+}
 
 export default async function handler(req, res) {
   // O Mercado Pago aceita 200 como "recebido"; devolvemos 200 mesmo em
@@ -84,7 +139,7 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           apikey: serviceKey,
           Authorization: `Bearer ${serviceKey}`,
-          Prefer: 'return=minimal'
+          Prefer: 'return=representation'
         },
         body: JSON.stringify({ status, payment_id: String(payment.id) })
       }
@@ -93,6 +148,12 @@ export default async function handler(req, res) {
     if (!patchRes.ok) {
       const errText = await patchRes.text();
       console.error('[MUV webhook] erro ao atualizar pedido no Supabase:', errText);
+    } else if (payment.status === 'approved' && payment.payment_method_id === 'pix') {
+      // Cartão já teve o e-mail disparado na hora em process-payment.js —
+      // aqui só cobrimos o caso do Pix, que só aprova depois (assíncrono).
+      const updated = await patchRes.json();
+      const orderRow = Array.isArray(updated) ? updated[0] : updated;
+      if (orderRow) sendOrderConfirmationEmail(orderRow);
     }
 
     res.status(200).json({ received: true });

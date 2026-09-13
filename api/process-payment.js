@@ -15,7 +15,65 @@
         na hora, sem sair da página.
      4) Pra Pix, o retorno inclui o QR Code / código "copia e cola"
         (point_of_interaction), que o Brick exibe automaticamente.
+
+   E-mail de confirmação (Brevo):
+     Quando o cartão é aprovado NA HORA, mandamos o e-mail de confirmação
+     direto daqui (não precisa esperar o webhook). Pra Pix, o pagamento só
+     é aprovado depois que a cliente paga o QR Code — nesse caso quem manda
+     o e-mail é o webhook (api/mercadopago-webhook.js), quando a confirmação
+     chegar. Isso evita mandar e-mail duplicado pro mesmo pedido.
+
+   Variáveis de ambiente necessárias (Vercel -> Settings -> Environment
+   Variables), além de MP_ACCESS_TOKEN:
+     BREVO_API_KEY      -> API key gerada em app.brevo.com (Settings -> API Keys)
+     BREVO_SENDER_EMAIL -> e-mail remetente verificado no Brevo (ex:
+                            pedidos@muvfitness.com.br). Se não configurar,
+                            o e-mail de confirmação simplesmente não é enviado.
 */
+
+async function sendOrderConfirmationEmail(order) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!apiKey || !senderEmail || !order || !order.email) return;
+
+  const itemsHtml = (order.items || [])
+    .map(item => `<tr>
+        <td style="padding:6px 0;">${item.qty}x ${item.name}${item.color || item.size ? ` (${[item.color, item.size].filter(Boolean).join(' · ')})` : ''}</td>
+        <td style="padding:6px 0;text-align:right;">R$ ${(item.price * item.qty).toFixed(2).replace('.', ',')}</td>
+      </tr>`)
+    .join('');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
+      <p>Recebemos seu pedido <strong>${order.orderNumber || ''}</strong> e o pagamento foi aprovado!</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${itemsHtml}</table>
+      <p><strong>Total: R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</strong></p>
+      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
+    </div>`;
+
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'api-key': apiKey
+      },
+      body: JSON.stringify({
+        sender: { name: 'MUV FITNESS', email: senderEmail },
+        to: [{ email: order.email }],
+        subject: `Pedido ${order.orderNumber || ''} confirmado - MUV FITNESS`,
+        htmlContent: html
+      })
+    });
+    if (!r.ok) {
+      console.error('[MUV e-mail] erro ao enviar confirmação:', await r.text());
+    }
+  } catch (err) {
+    console.error('[MUV e-mail] erro inesperado ao enviar confirmação:', err);
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -75,6 +133,12 @@ export default async function handler(req, res) {
       const friendly = data.cause?.[0]?.description || data.message || 'Pagamento recusado. Confira os dados e tente novamente.';
       res.status(mpRes.status === 401 || mpRes.status === 403 ? 502 : 200).json({ error: friendly, mp_status: data.status || null });
       return;
+    }
+
+    if (data.status === 'approved') {
+      // Não travamos a resposta esperando o e-mail — a cliente já vê o
+      // resultado aprovado na hora, o e-mail é disparado em paralelo.
+      sendOrderConfirmationEmail({ ...order, orderNumber, total: order?.total ?? data.transaction_amount });
     }
 
     res.status(200).json({
