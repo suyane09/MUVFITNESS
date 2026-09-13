@@ -1112,8 +1112,59 @@
   const FREE_SHIPPING_THRESHOLD = 300;
   const SHIPPING_COST = 19.90;
 
+  // ----- cupons de desconto -----
+  // percent: desconto em % sobre o subtotal dos produtos (não incide sobre o frete)
+  const COUPONS = {
+    'BEMVINDA10': { type: 'percent', value: 10 }
+  };
+  let appliedCoupon = null; // { code, type, value } | null
+
   function cartSubtotal(){
     return cart.reduce((s, i) => s + i.price * i.qty, 0);
+  }
+
+  function currentDiscount(){
+    if (!appliedCoupon) return 0;
+    const subtotal = cartSubtotal();
+    if (appliedCoupon.type === 'percent'){
+      return Number((subtotal * appliedCoupon.value / 100).toFixed(2));
+    }
+    if (appliedCoupon.type === 'fixed'){
+      return Math.min(appliedCoupon.value, subtotal);
+    }
+    return 0;
+  }
+
+  function showDiscountMsg(text, ok){
+    [document.getElementById('coDiscountMsg'), document.getElementById('coMobileDiscountMsg')].forEach(msg => {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.style.color = ok ? '#1a7d3a' : '#c0392b';
+      msg.style.display = 'block';
+    });
+  }
+
+  function applyDiscountCode(sourceInput){
+    const input = sourceInput || document.getElementById('coDiscountCode');
+    const code = (input.value || '').trim().toUpperCase();
+    const desktopInput = document.getElementById('coDiscountCode');
+    const mobileInput = document.getElementById('coMobileDiscountCode');
+    if (!code){
+      showDiscountMsg('Digite um código de cupom.', false);
+      return;
+    }
+    const coupon = COUPONS[code];
+    if (!coupon){
+      appliedCoupon = null;
+      showDiscountMsg('Cupom inválido ou expirado.', false);
+      renderCheckoutSummary();
+      return;
+    }
+    appliedCoupon = { code, ...coupon };
+    if (desktopInput) desktopInput.value = code;
+    if (mobileInput) mobileInput.value = code;
+    showDiscountMsg(`Cupom ${code} aplicado! ${coupon.type === 'percent' ? coupon.value + '% de desconto.' : 'Desconto aplicado.'}`, true);
+    renderCheckoutSummary();
   }
   
 
@@ -1180,7 +1231,8 @@
       renderShippingOptions();
     }
     const freight = currentFreight();
-    const total = subtotal + freight;
+    const discount = currentDiscount();
+    const total = Math.max(0, subtotal + freight - discount);
 
     const itemsHtml = cart.map(item => `
       <div class="co-sum-item">
@@ -1200,6 +1252,18 @@
     document.getElementById('coMobileItems').innerHTML = itemsHtml;
     document.getElementById('coSubtotal').textContent = brl(subtotal);
     document.getElementById('coMobileSubtotal').textContent = brl(subtotal);
+
+    const discountRow = document.getElementById('coDiscountRow');
+    const discountRowMobile = document.getElementById('coMobileDiscountRow');
+    if (discount > 0){
+      document.getElementById('coDiscountValue').textContent = '-' + brl(discount);
+      document.getElementById('coMobileDiscountValue').textContent = '-' + brl(discount);
+      discountRow.style.display = 'flex';
+      discountRowMobile.style.display = 'flex';
+    } else {
+      discountRow.style.display = 'none';
+      discountRowMobile.style.display = 'none';
+    }
 
     const freightEl = document.getElementById('coFreight');
     const freightElMobile = document.getElementById('coMobileFreight');
@@ -1400,6 +1464,30 @@
   // dispara o pagamento agora é o botão nativo dentro do Payment Brick.
   coForm.addEventListener('submit', (e) => e.preventDefault());
 
+  const coApplyDiscountBtn = document.getElementById('coApplyDiscount');
+  const coDiscountCodeInput = document.getElementById('coDiscountCode');
+  if (coApplyDiscountBtn && coDiscountCodeInput){
+    coApplyDiscountBtn.addEventListener('click', () => applyDiscountCode(coDiscountCodeInput));
+    coDiscountCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter'){
+        e.preventDefault();
+        applyDiscountCode(coDiscountCodeInput);
+      }
+    });
+  }
+
+  const coMobileApplyDiscountBtn = document.getElementById('coMobileApplyDiscount');
+  const coMobileDiscountCodeInput = document.getElementById('coMobileDiscountCode');
+  if (coMobileApplyDiscountBtn && coMobileDiscountCodeInput){
+    coMobileApplyDiscountBtn.addEventListener('click', () => applyDiscountCode(coMobileDiscountCodeInput));
+    coMobileDiscountCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter'){
+        e.preventDefault();
+        applyDiscountCode(coMobileDiscountCodeInput);
+      }
+    });
+  }
+
   /* =========================================================
      PAYMENT BRICK (Mercado Pago Checkout Bricks)
      -----------------------------------------------------
@@ -1432,7 +1520,7 @@
   }
 
   function getCheckoutAmount(){
-    return Number((cartSubtotal() + currentFreight()).toFixed(2));
+    return Number(Math.max(0, cartSubtotal() + currentFreight() - currentDiscount()).toFixed(2));
   }
 
   function buildOrderPayload(selectedPaymentMethod){
@@ -1455,6 +1543,8 @@
       items: cart,
       subtotal: cartSubtotal(),
       freight: currentFreight(),
+      discount: currentDiscount(),
+      couponCode: appliedCoupon ? appliedCoupon.code : null,
       total: getCheckoutAmount(),
       description: `Pedido MUV FITNESS — ${cart.length} item(ns)`
     };

@@ -504,9 +504,11 @@
             <input type="text" id="coMobileDiscountCode" placeholder="Código de desconto" style="padding:12px 14px;border:1px solid var(--line);border-radius:8px;font-size:13px;flex:1;">
             <button type="button" class="btn-outline" id="coMobileApplyDiscount" style="border-radius:8px;padding:0 16px;font-size:12px;">Aplicar</button>
           </div>
+          <div id="coMobileDiscountMsg" style="font-size:12px;margin-top:6px;display:none;"></div>
         </div>
         <div style="margin-top:14px;">
           <div class="co-sum-row"><span>Subtotal</span><strong id="coMobileSubtotal">R$ 0,00</strong></div>
+          <div class="co-sum-row" id="coMobileDiscountRow" style="display:none;"><span>Desconto</span><strong id="coMobileDiscountValue">-R$ 0,00</strong></div>
           <div class="co-sum-row"><span>Frete</span><strong id="coMobileFreight">A calcular</strong></div>
           <div class="co-sum-row total"><span>Total</span><strong><span class="co-cur">BRL</span> <span id="coMobileTotalRow">R$ 0,00</span></strong></div>
         </div>
@@ -646,9 +648,11 @@
                 <input type="text" id="coDiscountCode" placeholder="Código de desconto" style="padding:12px 14px;border:1px solid var(--line);border-radius:8px;font-size:13px;flex:1;">
                 <button type="button" class="btn-outline" id="coApplyDiscount" style="border-radius:8px;padding:0 16px;font-size:12px;">Aplicar</button>
               </div>
+              <div id="coDiscountMsg" style="font-size:12px;margin-top:6px;display:none;"></div>
             </div>
             <div>
               <div class="co-sum-row"><span>Subtotal</span><strong id="coSubtotal">R$ 0,00</strong></div>
+              <div class="co-sum-row" id="coDiscountRow" style="display:none;"><span>Desconto</span><strong id="coDiscountValue">-R$ 0,00</strong></div>
               <div class="co-sum-row"><span>Frete</span><strong id="coFreight">A calcular</strong></div>
               <div class="co-sum-row total"><span>Total</span><strong><span class="co-cur">BRL</span> <span id="coTotal">R$ 0,00</span></strong></div>
             </div>
