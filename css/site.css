@@ -99,6 +99,8 @@
   .slide.active{opacity:1;}
   .slide .bg{position:absolute;inset:0;background:linear-gradient(125deg,var(--nude) 0%, #f7dde3 45%, var(--bg) 100%);}
   .slide .bg::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(35,31,29,.14) 0%,rgba(35,31,29,0) 42%);}
+  .slide.s1 .bg{background-image:url('../img/hero-1.png');background-size:cover;background-position:top center;}
+  .slide.s1 .bg::after{background:linear-gradient(90deg,rgba(255,255,255,.85) 0%,rgba(255,255,255,.55) 32%,rgba(255,255,255,0) 60%);}
   .slide.s2 .bg{background:linear-gradient(125deg,#fbeef1 0%, var(--nude) 60%, #e2a7ba 100%);}
   .slide-copy{position:relative;z-index:2;padding:0 64px;max-width:560px;}
   @media(max-width:640px){.slide-copy{padding:0 24px;}}
