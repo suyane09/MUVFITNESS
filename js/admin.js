@@ -283,10 +283,14 @@ document.getElementById('menuToggle').addEventListener('click', ()=>{
 ========================================================= */
 function renderDashboard(){
   const orders = getOrders();
-  const revenue = orders.reduce((s,o)=>s+(o.total||0),0);
+  // pedidos cancelados não contam como faturamento
+  const NON_REVENUE_STATUSES = ['Cancelado'];
+  const revenueOrders = orders.filter(o=>!NON_REVENUE_STATUSES.includes(o.status));
+
+  const revenue = revenueOrders.reduce((s,o)=>s+(o.total||0),0);
   document.getElementById('kpiRevenue').textContent = brl(revenue);
   document.getElementById('kpiOrders').textContent = orders.length;
-  document.getElementById('kpiTicket').textContent = brl(orders.length ? revenue/orders.length : 0);
+  document.getElementById('kpiTicket').textContent = brl(revenueOrders.length ? revenue/revenueOrders.length : 0);
 
   const lowStock = products.filter(p=>p.active && p.stock<=5).length;
   document.getElementById('kpiLowStock').textContent = lowStock;
@@ -296,8 +300,8 @@ function renderDashboard(){
     const diff = Date.now()-new Date(o.date).getTime();
     return diff >= 7*86400000 && diff < 14*86400000;
   });
-  const last7rev = last7.reduce((s,o)=>s+(o.total||0),0);
-  const prev7rev = prev7.reduce((s,o)=>s+(o.total||0),0);
+  const last7rev = last7.filter(o=>!NON_REVENUE_STATUSES.includes(o.status)).reduce((s,o)=>s+(o.total||0),0);
+  const prev7rev = prev7.filter(o=>!NON_REVENUE_STATUSES.includes(o.status)).reduce((s,o)=>s+(o.total||0),0);
   const dEl = document.getElementById('kpiRevenueDelta');
   if(prev7rev===0 && last7rev===0){ dEl.textContent='sem pedidos nos últimos 7 dias'; dEl.className='kpi-delta flat'; }
   else if(prev7rev===0){ dEl.textContent='novo neste período'; dEl.className='kpi-delta up'; }
@@ -316,7 +320,7 @@ function renderDashboard(){
   }
   const dayTotals = days.map(d=>{
     const next = new Date(d); next.setDate(next.getDate()+1);
-    return orders.filter(o=>{ const t=new Date(o.date).getTime(); return t>=d.getTime() && t<next.getTime(); })
+    return revenueOrders.filter(o=>{ const t=new Date(o.date).getTime(); return t>=d.getTime() && t<next.getTime(); })
                  .reduce((s,o)=>s+(o.total||0),0);
   });
   const maxVal = Math.max(...dayTotals, 1);
@@ -370,7 +374,7 @@ function renderDashboard(){
 
   // top products by qty sold
   const qtyMap = {};
-  orders.forEach(o=>(o.items||[]).forEach(it=>{
+  revenueOrders.forEach(o=>(o.items||[]).forEach(it=>{
     const key = it.name || it.id || 'Item';
     qtyMap[key] = (qtyMap[key]||0) + (it.qty||it.quantity||1);
   }));
