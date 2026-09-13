@@ -100,9 +100,13 @@
   .slide .bg{position:absolute;inset:0;opacity:0;transition:opacity 1s var(--ease);background:linear-gradient(125deg,var(--nude) 0%, #f7dde3 45%, var(--bg) 100%);}
   .slide.active .bg{opacity:1;}
   .slide .bg::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(35,31,29,.14) 0%,rgba(35,31,29,0) 42%);}
-  .slide.s1 .bg{background-image:url('../img/hero-1.png');background-size:cover;background-position:top center;}
+  /* fotos: "contain" garante que a imagem inteira (incluindo os pés) sempre apareça, em qualquer tela,
+     em vez de "cover", que ampliava e cortava a parte de baixo. A imagem fica ancorada embaixo,
+     como se as modelos estivessem "de pé" na seção, e o degradê some por trás onde sobra espaço. */
+  .slide.s1 .bg,.slide.s2 .bg{background-repeat:no-repeat;background-position:bottom center;background-size:contain;}
+  .slide.s1 .bg{background-image:url('../img/hero-1.png'),linear-gradient(125deg,var(--nude) 0%, #f7dde3 45%, var(--bg) 100%);}
   .slide.s1 .bg::after{background:linear-gradient(90deg,rgba(255,255,255,.85) 0%,rgba(255,255,255,.55) 32%,rgba(255,255,255,0) 60%);}
-  .slide.s2 .bg{background:linear-gradient(125deg,#fbeef1 0%, var(--nude) 60%, #e2a7ba 100%);}
+  .slide.s2 .bg{background-image:url('../img/hero-2.png'),linear-gradient(125deg,#fbeef1 0%, var(--nude) 60%, #e2a7ba 100%);}
   /* texto: some rápido ao sair e só reaparece depois, pra nunca sobrepor o texto do outro slide */
   .slide-copy{position:relative;z-index:2;padding:0 64px;max-width:560px;opacity:0;transform:translateY(14px);transition:opacity .45s var(--ease),transform .45s var(--ease);}
   .slide.active .slide-copy{opacity:1;transform:translateY(0);transition-delay:.5s;}
