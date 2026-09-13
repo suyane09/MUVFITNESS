@@ -6,8 +6,8 @@
         que veio na notificação)
      2) traduz o status pra um texto em português
      3) atualiza o pedido correspondente na tabela `orders` do Supabase,
-        casando pelo `order_number` (gravado como external_reference lá
-        na criação da preferência, em /api/checkout.js)
+        casando pelo `order_number` (gravado como external_reference no
+        pagamento, em /api/process-payment.js)
 
    Configuração necessária no painel da Vercel (Settings -> Environment
    Variables), além de MP_ACCESS_TOKEN:

@@ -1220,6 +1220,7 @@
     document.getElementById('coMobileTotal').textContent = brl(total);
 
     renderInstallments(total);
+    renderPaymentBrick();
   }
 
   function renderInstallments(total){
@@ -1300,29 +1301,6 @@
   document.getElementById('coCep').addEventListener('blur', lookupCep);
   document.getElementById('coCepSearch').addEventListener('click', lookupCep);
 
-  // ----- payment method toggle (Cartão / Pix) -----
-  document.querySelectorAll('input[name="coPay"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const isCard = radio.value === 'card';
-      document.getElementById('coPayCardHead').classList.toggle('selected', isCard);
-      document.getElementById('coPayPixHead').classList.toggle('selected', !isCard);
-      document.getElementById('coPayCardBody').classList.toggle('active', isCard);
-      document.getElementById('coPayPixBody').classList.toggle('active', !isCard);
-      [...document.querySelectorAll('#coPayCardBody input')].forEach(el => {
-        if (el.type === 'checkbox') return;
-        el.required = isCard;
-      });
-    });
-  });
-  document.getElementById('coPayCardHead').addEventListener('click', () => {
-    document.querySelector('input[name="coPay"][value="card"]').checked = true;
-    document.querySelector('input[name="coPay"][value="card"]').dispatchEvent(new Event('change'));
-  });
-  document.getElementById('coPayPixHead').addEventListener('click', () => {
-    document.querySelector('input[name="coPay"][value="pix"]').checked = true;
-    document.querySelector('input[name="coPay"][value="pix"]').dispatchEvent(new Event('change'));
-  });
-
   document.getElementById('coPhone').addEventListener('input', (e) => {
     let v = e.target.value.replace(/\D/g, '').slice(0, 11);
     if (v.length > 6) v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
@@ -1402,7 +1380,7 @@
     try { history.pushState({}, '', location.pathname + location.search); } catch (err) { /* no-op in sandboxed preview */ }
   });
 
-  // ----- submit / "Pagar agora" -----
+  // ----- validação dos campos de contato/entrega -----
   function validateCheckoutForm(){
     let firstInvalid = null;
     const requiredEls = coForm.querySelectorAll('[required]');
@@ -1418,22 +1396,47 @@
     return firstInvalid;
   }
 
-  coForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const errorMsg = document.getElementById('coErrorMsg');
-    const invalid = validateCheckoutForm();
-    if (invalid){
-      errorMsg.classList.add('active');
-      invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    errorMsg.classList.remove('active');
-    processOrder();
-  });
+  // impede que a tecla Enter em qualquer campo tente enviar o <form> — quem
+  // dispara o pagamento agora é o botão nativo dentro do Payment Brick.
+  coForm.addEventListener('submit', (e) => e.preventDefault());
 
-  function processOrder(){
-    const payMethod = document.querySelector('input[name="coPay"]:checked').value;
-    const order = {
+  /* =========================================================
+     PAYMENT BRICK (Mercado Pago Checkout Bricks)
+     -----------------------------------------------------
+     Mostra os campos de cartão/Pix DENTRO da própria página (sem
+     redirecionar pro Mercado Pago). O Brick tokeniza os dados do cartão
+     no navegador da cliente; a gente só recebe esse token (nunca o
+     número do cartão) e manda pro backend em /api/process-payment, que
+     usa o Access Token secreto pra criar o pagamento de verdade.
+  ========================================================= */
+  let mpInstance = null;
+  let paymentBrickController = null;
+  let brickMountedAmount = null;
+
+  async function getMercadoPagoInstance(){
+    if (mpInstance) return mpInstance;
+    if (typeof MercadoPago === 'undefined'){
+      console.error('[MUV pagamento] SDK do Mercado Pago não carregou.');
+      return null;
+    }
+    try {
+      const r = await fetch('/api/mp-public-key');
+      const data = await r.json();
+      if (!data.publicKey) throw new Error(data.error || 'Chave pública ausente.');
+      mpInstance = new MercadoPago(data.publicKey, { locale: 'pt-BR' });
+      return mpInstance;
+    } catch (err){
+      console.error('[MUV pagamento] erro ao obter a chave pública:', err);
+      return null;
+    }
+  }
+
+  function getCheckoutAmount(){
+    return Number((cartSubtotal() + currentFreight()).toFixed(2));
+  }
+
+  function buildOrderPayload(selectedPaymentMethod){
+    return {
       email: document.getElementById('coEmail').value,
       delivery: coDeliveryMethod,
       address: coDeliveryMethod === 'ship' ? {
@@ -1448,58 +1451,132 @@
         state: document.getElementById('coState').value,
         phone: document.getElementById('coPhone').value
       } : null,
-      paymentMethod: payMethod,
+      paymentMethod: selectedPaymentMethod, // 'credit_card', 'debit_card', 'bank_transfer' (pix) etc.
       items: cart,
       subtotal: cartSubtotal(),
       freight: currentFreight(),
-      total: cartSubtotal() + currentFreight()
+      total: getCheckoutAmount(),
+      description: `Pedido MUV FITNESS — ${cart.length} item(ns)`
     };
+  }
 
-    /* =====================================================
-       INTEGRAÇÃO COM MERCADO PAGO (Checkout Pro)
-       -----------------------------------------------------
-       O front-end nunca fala direto com a API do Mercado Pago
-       (o Access Token é secreto). Em vez disso, enviamos o
-       pedido para a função backend em /api/checkout, que cria
-       a "preferência" de pagamento e devolve o link de checkout
-       (init_point). O cliente é então redirecionado pra lá,
-       onde escolhe Pix, cartão de crédito/débito, etc.
-    ===================================================== */
-    const payBtn = document.getElementById('coPayBtn');
-    const originalBtnHtml = payBtn.innerHTML;
-    payBtn.disabled = true;
-    payBtn.innerHTML = 'Processando...';
+  function handlePaymentResult(data, order){
+    if (data.status === 'approved'){
+      cart = [];
+      saveCart();
+      checkoutPage.querySelector('.container').scrollIntoView({ behavior: 'instant' in window ? 'instant' : 'auto', block: 'start' });
+      coForm.style.display = 'none';
+      document.getElementById('coSuccessMsg').textContent = 'Seu pagamento foi aprovado! Você recebe a confirmação por e-mail e pode acompanhar tudo em "Meus pedidos".';
+      coSuccess.classList.add('active');
+    } else if (data.status === 'pending' || data.status === 'in_process'){
+      // Pix: o próprio Brick mostra o QR Code / código "copia e cola" aqui embaixo dos campos.
+      // Não limpamos o carrinho ainda — só quando o webhook confirmar o pagamento.
+      const errorMsg = document.getElementById('coErrorMsg');
+      errorMsg.style.color = 'var(--ink)';
+      errorMsg.textContent = 'Pedido gerado! Finalize o pagamento pelo Pix acima — assim que for confirmado, avisamos por e-mail.';
+      errorMsg.classList.add('active');
+    } else {
+      const errorMsg = document.getElementById('coErrorMsg');
+      errorMsg.style.color = '';
+      errorMsg.textContent = 'Pagamento não aprovado. Confira os dados do cartão ou tente outra forma de pagamento.';
+      errorMsg.classList.add('active');
+    }
+  }
 
-    fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(order)
-    })
-      .then(r => r.json())
-      .then(async (data) => {
-        if (!data.init_point) {
-          throw new Error(data.error || 'Não foi possível gerar o pagamento.');
+  async function renderPaymentBrick(){
+    if (!checkoutPage.classList.contains('active')) return;
+    const container = document.getElementById('paymentBrick_container');
+    if (!container) return;
+
+    const amount = getCheckoutAmount();
+    if (amount <= 0) return;
+    // já montado com o mesmo valor: não precisa remontar (evita perder o
+    // que a cliente já digitou no cartão por causa de um recálculo bobo)
+    if (paymentBrickController && amount === brickMountedAmount) return;
+
+    const loadingEl = document.getElementById('coPayLoading');
+    if (loadingEl){ loadingEl.classList.remove('hidden'); loadingEl.textContent = 'Carregando formas de pagamento...'; }
+
+    const mp = await getMercadoPagoInstance();
+    if (!mp){
+      if (loadingEl) loadingEl.textContent = 'Pagamento indisponível no momento. Recarregue a página e tente novamente.';
+      return;
+    }
+
+    if (paymentBrickController){
+      try { await paymentBrickController.unmount(); } catch (err) { /* já desmontado */ }
+      paymentBrickController = null;
+    }
+
+    try {
+      const bricksBuilder = mp.bricks();
+      paymentBrickController = await bricksBuilder.create('payment', 'paymentBrick_container', {
+        initialization: {
+          amount,
+          payer: { email: (document.getElementById('coEmail').value || '').trim() || undefined }
+        },
+        customization: {
+          paymentMethods: {
+            creditCard: 'all',
+            debitCard: 'excluded',
+            ticket: 'excluded',
+            atm: 'excluded',
+            bankTransfer: 'all', // Pix
+            maxInstallments: 12
+          }
+        },
+        callbacks: {
+          onReady: () => { if (loadingEl) loadingEl.classList.add('hidden'); },
+          onError: (error) => { console.error('[MUV pagamento] erro no Brick:', error); },
+          onSubmit: ({ selectedPaymentMethod, formData }) => new Promise((resolve, reject) => {
+            const errorMsg = document.getElementById('coErrorMsg');
+            errorMsg.style.color = '';
+            const invalid = validateCheckoutForm();
+            if (invalid){
+              errorMsg.textContent = 'Confira os campos destacados e tente novamente.';
+              errorMsg.classList.add('active');
+              invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              reject();
+              return;
+            }
+            errorMsg.classList.remove('active');
+
+            const order = buildOrderPayload(selectedPaymentMethod);
+
+            fetch('/api/process-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ formData, order })
+            })
+              .then(r => r.json())
+              .then(async (data) => {
+                if (data.error){
+                  errorMsg.textContent = data.error;
+                  errorMsg.classList.add('active');
+                  reject();
+                  return;
+                }
+                order.orderNumber = data.order_number;
+                order.paymentStatus = data.status;
+                order.paymentId = data.id;
+                await saveOrder(order);
+                handlePaymentResult(data, order);
+                resolve();
+              })
+              .catch((err) => {
+                console.error('Erro ao processar pagamento:', err);
+                errorMsg.textContent = 'Não foi possível processar o pagamento. Tente novamente em instantes.';
+                errorMsg.classList.add('active');
+                reject();
+              });
+          })
         }
-        // Usa o mesmo número de pedido gerado no backend (/api/checkout) como
-        // external_reference no Mercado Pago, pra o webhook conseguir casar
-        // o pagamento com o pedido certo no Supabase.
-        order.orderNumber = data.order_number;
-        await saveOrder(order);
-        // Não limpa o carrinho aqui: o pagamento ainda não foi confirmado.
-        // Isso só acontece quando o cliente volta com "?status=success"
-        // (ver checkPaymentReturn logo abaixo) — assim, se ela cancelar ou
-        // o pagamento for recusado no Mercado Pago, o carrinho continua
-        // intacto pra tentar de novo.
-        window.location.href = data.init_point;
-      })
-      .catch(err => {
-        console.error('Erro ao criar pagamento:', err);
-        const errorMsg = document.getElementById('coErrorMsg');
-        errorMsg.textContent = 'Não foi possível iniciar o pagamento. Tente novamente em instantes.';
-        errorMsg.classList.add('active');
-        payBtn.disabled = false;
-        payBtn.innerHTML = originalBtnHtml;
       });
+      brickMountedAmount = amount;
+    } catch (err){
+      console.error('[MUV pagamento] erro ao montar o Brick:', err);
+      if (loadingEl){ loadingEl.textContent = 'Não foi possível carregar o pagamento. Recarregue a página.'; loadingEl.classList.remove('hidden'); }
+    }
   }
 
   /* =========================================================

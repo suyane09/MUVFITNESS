@@ -1,11 +1,14 @@
-/* MUV FITNESS - Cria a preferência de pagamento no Mercado Pago (Checkout Pro)
+/* MUV FITNESS - [NÃO USADO MAIS] Cria a preferência de pagamento no Mercado
+   Pago (Checkout Pro) — este arquivo fica aqui só de referência.
    ---------------------------------------------------------------------------
-   O front-end (js/site.js) envia o pedido pra cá via POST. Esta função:
-     1) monta os itens do pedido no formato que o Mercado Pago espera
-     2) cria uma "preferência de pagamento" pela API do Mercado Pago
-     3) devolve o link (init_point) pro qual o cliente é redirecionado,
-        onde ele escolhe Pix, cartão de crédito etc. e finaliza o pagamento
+   O front-end (js/site.js) NÃO chama mais este endpoint. O checkout agora usa
+   o Payment Brick (Checkout Bricks), que mostra cartão/Pix direto na página
+   sem redirecionar — ver api/process-payment.js e api/mp-public-key.js.
 
+   Este arquivo pode ser apagado com segurança quando tiver certeza de que
+   não precisa mais dele. Mantido só como histórico/backup da integração
+   anterior (Checkout Pro), caso um dia queiram voltar a usar redirecionamento.
+   ---------------------------------------------------------------------------
    O Access Token do Mercado Pago é secreto e SÓ existe aqui no servidor,
    lido da variável de ambiente MP_ACCESS_TOKEN (configurada no painel da
    Vercel). Ele nunca é enviado para o navegador do cliente.
