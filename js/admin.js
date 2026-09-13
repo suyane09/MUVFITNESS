@@ -81,8 +81,86 @@ if(!settings){ settings = seedSettings(); LS.set(KEYS.settings, settings); }
 let creds = LS.get(KEYS.creds, null);
 if(!creds){ creds = {user:'admin', pass:'muv2026'}; LS.set(KEYS.creds, creds); }
 
-function getOrders(){ return LS.get(KEYS.orders, []); }
-function saveOrders(list){ LS.set(KEYS.orders, list); }
+/* -----------------------------------------------------------------------
+   PEDIDOS REAIS (Supabase)
+   Antes isso lia um localStorage ('muv_orders') que nunca era escrito por
+   ninguém. Agora busca de verdade na tabela `orders` do Supabase, através
+   do endpoint /api/admin-orders (que usa a service_role key no servidor —
+   ver comentários em api/admin-orders.js).
+----------------------------------------------------------------------- */
+let ordersCache = [];
+
+function getAdminApiKey(){
+  let k = localStorage.getItem('muv_admin_api_key');
+  if(!k){
+    k = window.prompt('Cole a chave de acesso da API de pedidos (a mesma configurada em ADMIN_ORDERS_KEY na Vercel). Isso só é pedido uma vez neste navegador.');
+    if(k) localStorage.setItem('muv_admin_api_key', k.trim());
+  }
+  return (k||'').trim();
+}
+
+function mapOrderRow(row){
+  return {
+    id: row.order_number || row.id,
+    _dbId: row.id,
+    email: row.email,
+    date: row.created_at,
+    items: row.items || [],
+    subtotal: row.subtotal || 0,
+    freight: row.freight || 0,
+    total: row.total || 0,
+    status: row.status || 'Pagamento pendente',
+    paymentMethod: row.payment_method,
+    address: row.shipping_address,
+    delivery: row.shipping_address ? undefined : 'pickup'
+  };
+}
+
+async function fetchOrdersFromServer(){
+  const key = getAdminApiKey();
+  if(!key) return [];
+  try{
+    const res = await fetch('/api/admin-orders', { headers:{ 'x-admin-key': key } });
+    if(res.status === 401){
+      localStorage.removeItem('muv_admin_api_key');
+      showToast('Chave da API de pedidos inválida. Recarregue a página pra digitar de novo.');
+      return [];
+    }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    return (data||[]).map(mapOrderRow);
+  }catch(err){
+    console.error('[MUV admin] erro ao buscar pedidos do Supabase:', err);
+    showToast('Não foi possível carregar os pedidos. Veja o console.');
+    return [];
+  }
+}
+
+async function refreshOrders(onDone){
+  ordersCache = await fetchOrdersFromServer();
+  if(onDone) onDone();
+}
+
+async function updateOrderStatus(orderNumber, status){
+  const key = getAdminApiKey();
+  try{
+    const res = await fetch('/api/admin-orders', {
+      method:'PATCH',
+      headers:{ 'Content-Type':'application/json', 'x-admin-key': key },
+      body: JSON.stringify({ order_number: orderNumber, status })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const idx = ordersCache.findIndex(o=>o.id===orderNumber);
+    if(idx>-1) ordersCache[idx].status = status;
+    return true;
+  }catch(err){
+    console.error('[MUV admin] erro ao atualizar status do pedido:', err);
+    showToast('Não foi possível atualizar o status. Tente de novo.');
+    return false;
+  }
+}
+
+function getOrders(){ return ordersCache; }
 function getCustomersMeta(){ return LS.get(KEYS.customersMeta, {}); }
 function saveCustomersMeta(m){ LS.set(KEYS.customersMeta, m); }
 
@@ -176,13 +254,19 @@ function goView(name){
   // Guarda a aba atual pra poder voltar pra ela caso a página recarregue
   // (ex.: depois de salvar um produto no Supabase, ver saveProduct em supabase-products.js).
   sessionStorage.setItem('muv_admin_last_view', name);
-  if(name==='dashboard') safeRender(renderDashboard);
   if(name==='products') safeRender(renderProducts);
   if(name==='showcase'){ safeRender(renderShowcase); safeRender(renderAboutImage); }
-  if(name==='orders') safeRender(renderOrders);
-  if(name==='customers') safeRender(renderCustomers);
   if(name==='coupons') safeRender(renderCoupons);
   if(name==='settings') safeRender(renderSettings);
+  if(name==='dashboard' || name==='orders' || name==='customers'){
+    // pedidos vêm do Supabase (rede), então busca de novo sempre que a
+    // pessoa entra numa dessas telas, pra refletir pedidos novos.
+    refreshOrders(()=>{
+      if(name==='dashboard') safeRender(renderDashboard);
+      if(name==='orders') safeRender(renderOrders);
+      if(name==='customers') safeRender(renderCustomers);
+    });
+  }
 }
 document.querySelectorAll('.side-link').forEach(l=>{
   l.addEventListener('click', (e)=>{ e.preventDefault(); goView(l.dataset.view); });
@@ -988,13 +1072,12 @@ function renderOrders(){
   }).join('');
 
   tbody.querySelectorAll('[data-order-status]').forEach(sel=>{
-    sel.addEventListener('change', ()=>{
-      const orders = getOrders();
-      const idx = orders.findIndex(o=>o.id===sel.dataset.orderStatus);
-      if(idx>-1){
-        orders[idx].status = sel.value;
-        saveOrders(orders);
-        showToast('Status do pedido #'+sel.dataset.orderStatus+' atualizado para "'+sel.value+'".');
+    sel.addEventListener('change', async ()=>{
+      const orderId = sel.dataset.orderStatus;
+      const newStatus = sel.value;
+      const ok = await updateOrderStatus(orderId, newStatus);
+      if(ok){
+        showToast('Status do pedido #'+orderId+' atualizado para "'+newStatus+'".');
         renderDashboard();
       }
     });
@@ -1287,26 +1370,34 @@ document.getElementById('globalSearch').addEventListener('input', ()=>{
 /* =========================================================
    INIT
 ========================================================= */
-function renderAll(){
-  safeRender(renderDashboard);
+async function renderAll(){
   safeRender(renderProducts);
   safeRender(renderShowcase);
   safeRender(renderAboutImage);
-  safeRender(renderOrders);
-  safeRender(renderCustomers);
   safeRender(renderCoupons);
   safeRender(renderSettings);
+  await refreshOrders();
+  safeRender(renderDashboard);
+  safeRender(renderOrders);
+  safeRender(renderCustomers);
 }
 
-// keep dashboard counters fresh if orders change in another tab (same-origin storefront)
-window.addEventListener('storage', function(ev){
-  if(ev.key===KEYS.orders && appEl.classList.contains('visible')){
-    const active = document.querySelector('.view.active').id.replace('view-','');
-    renderDashboard();
-    if(active==='orders') renderOrders();
-    if(active==='customers') renderCustomers();
+// atualiza pedidos automaticamente a cada 30s enquanto o admin estiver
+// numa tela que depende deles, pra pegar pedidos novos sem precisar
+// trocar de aba ou recarregar a página.
+setInterval(()=>{
+  if(!isLoggedIn()) return;
+  const activeEl = document.querySelector('.view.active');
+  if(!activeEl) return;
+  const active = activeEl.id.replace('view-','');
+  if(active==='dashboard' || active==='orders' || active==='customers'){
+    refreshOrders(()=>{
+      if(active==='dashboard') safeRender(renderDashboard);
+      if(active==='orders') safeRender(renderOrders);
+      if(active==='customers') safeRender(renderCustomers);
+    });
   }
-});
+}, 30000);
 
 /* =========================================================
    ENTRADA NO PAINEL
