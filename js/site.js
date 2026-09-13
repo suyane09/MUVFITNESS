@@ -1518,9 +1518,9 @@
         customization: {
           paymentMethods: {
             creditCard: 'all',
-            debitCard: 'excluded',
-            ticket: 'excluded',
-            atm: 'excluded',
+            debitCard: '',
+            ticket: '',
+            atm: '',
             bankTransfer: 'all', // Pix
             maxInstallments: 12
           }
