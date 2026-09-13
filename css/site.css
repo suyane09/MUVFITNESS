@@ -100,10 +100,11 @@
   .slide .bg{position:absolute;inset:0;opacity:0;transition:opacity 1s var(--ease);background:linear-gradient(125deg,var(--nude) 0%, #f7dde3 45%, var(--bg) 100%);}
   .slide.active .bg{opacity:1;}
   .slide .bg::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(35,31,29,.14) 0%,rgba(35,31,29,0) 42%);}
-  /* fotos: "cover" preenche a seção inteira em qualquer tela (sem sobra vazia), e
-     "position: bottom" garante que, se algo precisar ser cortado, é a parte de CIMA
-     da imagem (fundo/topo da cabeça) — os pés das modelos nunca saem da tela. */
-  .slide.s1 .bg,.slide.s2 .bg{background-repeat:no-repeat;background-position:bottom center;background-size:cover;}
+  /* fotos: alarguei o fundo de cada imagem pros lados (esticando o próprio degradê, sem tocar
+     nas modelos) até ficar bem mais larga que qualquer tela real. Com isso o "cover" sempre encaixa
+     pela ALTURA — nunca precisa cortar em cima nem embaixo, então cabeça e pés nunca somem.
+     O que eventualmente é cortado em telas muito estreitas é só a lateral (fundo/marca d'água). */
+  .slide.s1 .bg,.slide.s2 .bg{background-repeat:no-repeat;background-position:center;background-size:cover;}
   .slide.s1 .bg{background-image:url('../img/hero-1.png');}
   .slide.s1 .bg::after{background:linear-gradient(90deg,rgba(255,255,255,.85) 0%,rgba(255,255,255,.55) 32%,rgba(255,255,255,0) 60%);}
   .slide.s2 .bg{background-image:url('../img/hero-2.png');}
