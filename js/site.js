@@ -1570,6 +1570,16 @@
       errorMsg.style.color = '';
       errorMsg.textContent = 'Pagamento não aprovado. Confira os dados do cartão ou tente outra forma de pagamento.';
       errorMsg.classList.add('active');
+      // O Brick não libera o botão "Pagar" sozinho depois de um pagamento
+      // recusado — remontamos o formulário do zero pra cliente poder
+      // tentar de novo (outro cartão, corrigir dados, ou trocar pra Pix)
+      // sem precisar recarregar a página.
+      if (paymentBrickController){
+        try { paymentBrickController.unmount(); } catch (err) { console.error('[MUV pagamento] erro ao desmontar o Brick:', err); }
+      }
+      paymentBrickController = null;
+      brickMountedAmount = null;
+      renderPaymentBrick();
     }
   }
 
@@ -1639,7 +1649,7 @@
               body: JSON.stringify({ formData, order })
             })
               .then(r => r.json())
-              .then(async (data) => {
+              .then((data) => {
                 if (data.error){
                   errorMsg.textContent = data.error;
                   errorMsg.classList.add('active');
@@ -1649,9 +1659,13 @@
                 order.orderNumber = data.order_number;
                 order.paymentStatus = data.status;
                 order.paymentId = data.id;
-                await saveOrder(order);
+                // Mostra o resultado (aprovado/pendente/recusado) pra cliente
+                // AGORA, sem esperar o pedido terminar de salvar no Supabase —
+                // isso evita a cliente ficar travada olhando o botão "Pagar"
+                // enquanto o registro do pedido acontece em segundo plano.
                 handlePaymentResult(data, order);
                 resolve();
+                saveOrder(order);
               })
               .catch((err) => {
                 console.error('Erro ao processar pagamento:', err);
