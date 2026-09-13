@@ -834,20 +834,40 @@ document.getElementById('pfSizeCustom').addEventListener('keydown', function(e){
 document.getElementById('pfImgInput').addEventListener('change', function(e){
   const files = Array.from(e.target.files || []);
   if(!files.length) return;
-  const results = new Array(files.length);
-  let loaded = 0;
-  files.forEach((file, i)=>{
-    const reader = new FileReader();
-    reader.onload = function(ev){
-      results[i] = ev.target.result;
-      loaded++;
-      if(loaded === files.length){
-        pendingImages = pendingImages.concat(results);
-        renderPfImgList();
-      }
-    };
-    reader.readAsDataURL(file);
+
+  // Redimensiona/comprime a foto assim que é selecionada, antes de guardar em
+  // pendingImages. Fotos tiradas direto da câmera do celular chegam em alta
+  // resolução (vários MB cada) e, sem isso, estouram o limite do localStorage
+  // (~5-10MB por site) na hora de salvar o produto — o que trava o cadastro
+  // silenciosamente só no celular, já que no PC normalmente as imagens
+  // escolhidas já são menores.
+  function resizeImage(file){
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const max = 1600;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => resolve(ev.target.result); // fallback: usa o original se não conseguir redimensionar
+        img.src = ev.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  Promise.all(files.map(resizeImage)).then(results => {
+    pendingImages = pendingImages.concat(results.filter(Boolean));
+    renderPfImgList();
   });
+
   e.target.value = '';
 });
 
@@ -893,7 +913,23 @@ document.getElementById('productForm').addEventListener('submit', function(e){
     products.unshift(data);
     showToast('Produto cadastrado.');
   }
-  LS.set(KEYS.products, products);
+  // Protegido com try/catch: se as imagens forem grandes demais e estourarem
+  // o limite do localStorage, avisa a pessoa em vez de travar o cadastro
+  // silenciosamente (o que antes acontecia sobretudo em fotos de celular).
+  try {
+    LS.set(KEYS.products, products);
+  } catch (err) {
+    console.error('[MUV] Erro ao salvar produto localmente:', err);
+    showToast('Não foi possível salvar: imagens muito grandes para o navegador. Tente fotos menores ou remova alguma.');
+    if(editingProductId){
+      // desfaz a alteração otimista feita no array em memória
+      const idx = products.findIndex(x=>x.id===editingProductId);
+      if(idx>-1) products[idx] = Object.assign({}, products[idx]);
+    } else {
+      products.shift();
+    }
+    return;
+  }
   closeModal('productModalOverlay');
   renderProducts(); renderDashboard();
 
