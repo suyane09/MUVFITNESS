@@ -128,6 +128,17 @@ export default async function handler(req, res) {
     };
     const status = statusMap[payment.status] || payment.status;
 
+    // Busca o status atual do pedido ANTES de atualizar, pra não descontar
+    // o estoque de novo caso o Mercado Pago reenvie a mesma notificação
+    // (isso acontece; é normal).
+    const currentRes = await fetch(
+      `${supabaseUrl}/rest/v1/orders?order_number=eq.${encodeURIComponent(payment.external_reference)}&select=status`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    );
+    const currentRows = await currentRes.json();
+    const previousStatus = Array.isArray(currentRows) && currentRows[0] ? currentRows[0].status : null;
+    const wasAlreadyApproved = previousStatus === statusMap.approved;
+
     const patchRes = await fetch(
       `${supabaseUrl}/rest/v1/orders?order_number=eq.${encodeURIComponent(payment.external_reference)}`,
       {
@@ -145,17 +156,85 @@ export default async function handler(req, res) {
     if (!patchRes.ok) {
       const errText = await patchRes.text();
       console.error('[MUV webhook] erro ao atualizar pedido no Supabase:', errText);
-    } else if (payment.status === 'approved' && payment.payment_method_id === 'pix') {
-      // Cartão já teve o e-mail disparado na hora em process-payment.js —
-      // aqui só cobrimos o caso do Pix, que só aprova depois (assíncrono).
+    } else if (payment.status === 'approved') {
       const updated = await patchRes.json();
       const orderRow = Array.isArray(updated) ? updated[0] : updated;
-      if (orderRow) sendOrderConfirmationEmail(orderRow);
+      if (orderRow) {
+        // Baixa o estoque só na primeira vez que este pedido é aprovado.
+        if (!wasAlreadyApproved) {
+          await discountStock(orderRow, supabaseUrl, serviceKey);
+        }
+        // Cartão já teve o e-mail disparado na hora em process-payment.js —
+        // aqui só cobrimos o caso do Pix, que só aprova depois (assíncrono).
+        if (payment.payment_method_id === 'pix') {
+          sendOrderConfirmationEmail(orderRow);
+        }
+      }
     }
 
     res.status(200).json({ received: true });
   } catch (err) {
     console.error('[MUV webhook] erro inesperado:', err);
     res.status(200).json({ received: true });
+  }
+}
+
+/* Desconta a quantidade comprada do estoque de cada produto do pedido.
+   Se o produto tiver grade de cor/tamanho (metadata.variants), desconta
+   da variante certa e recalcula o total; senão, desconta direto do
+   campo `stock`. Quando o estoque chega a 0, o site já mostra "Esgotado"
+   sozinho (ver js/site.js, tag do card do produto). */
+async function discountStock(order, supabaseUrl, serviceKey) {
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  for (const item of items) {
+    if (!item || !item.id) continue;
+    const qty = Number(item.qty || item.quantity || 1) || 1;
+
+    try {
+      const getRes = await fetch(
+        `${supabaseUrl}/rest/v1/products?id=eq.${encodeURIComponent(item.id)}&select=id,stock,metadata`,
+        { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+      );
+      const rows = await getRes.json();
+      const product = Array.isArray(rows) ? rows[0] : null;
+      if (!product) continue;
+
+      const metadata = product.metadata && typeof product.metadata === 'object' ? product.metadata : {};
+      const variants = Array.isArray(metadata.variants) ? metadata.variants : [];
+      let newStock;
+      let newMetadata = metadata;
+
+      if (variants.length && (item.color || item.size)) {
+        const updatedVariants = variants.map(v =>
+          (v.color === item.color && v.size === item.size)
+            ? { ...v, stock: Math.max(0, (Number(v.stock) || 0) - qty) }
+            : v
+        );
+        newMetadata = { ...metadata, variants: updatedVariants };
+        newStock = updatedVariants.reduce((s, v) => s + (Number(v.stock) || 0), 0);
+      } else {
+        newStock = Math.max(0, (Number(product.stock) || 0) - qty);
+      }
+
+      const patchRes = await fetch(
+        `${supabaseUrl}/rest/v1/products?id=eq.${encodeURIComponent(item.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify({ stock: newStock, metadata: newMetadata })
+        }
+      );
+      if (!patchRes.ok) {
+        console.error('[MUV webhook] erro ao baixar estoque do produto', item.id, await patchRes.text());
+      }
+    } catch (err) {
+      console.error('[MUV webhook] erro inesperado ao baixar estoque do produto', item.id, err);
+    }
   }
 }
