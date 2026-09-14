@@ -48,6 +48,8 @@
      de "Enviado"), ajuste as condições da função sendStatusUpdateEmail.
 */
 
+import { buildEmailHtml, SITE_URL } from './email-template.js';
+
 async function sendStatusUpdateEmail(order, status) {
   const apiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL;
@@ -55,28 +57,34 @@ async function sendStatusUpdateEmail(order, status) {
 
   const statusLower = String(status).toLowerCase();
   let subject;
+  let title;
   let message;
 
   if (statusLower.includes('separa')) {
     subject = `Seu pedido ${order.order_number || ''} está em separação - MUV FITNESS`;
-    message = 'Seu pedido já está sendo separado com carinho pela nossa equipe!';
+    title = 'Seu pedido está em separação 📦';
+    message = 'Seu pedido já está sendo separado com carinho pela nossa equipe e logo segue para o transporte.';
   } else if (statusLower.includes('envi') || statusLower.includes('caminho') || statusLower.includes('transport')) {
     subject = `Seu pedido ${order.order_number || ''} saiu para entrega - MUV FITNESS`;
-    message = 'Seu pedido já saiu para entrega e deve chegar em breve!';
+    title = 'Seu pedido está a caminho! 🚚';
+    message = 'Seu pedido já saiu para entrega e deve chegar em breve.';
   } else if (statusLower.includes('entreg')) {
     subject = `Seu pedido ${order.order_number || ''} foi entregue - MUV FITNESS`;
-    message = 'Seu pedido foi entregue! Esperamos que você ame os produtos.';
+    title = 'Seu pedido foi entregue! 💛';
+    message = 'Seu pedido foi entregue. Esperamos que você ame os produtos!';
   } else {
     // Status sem e-mail configurado (ex.: os automáticos do webhook de pagamento)
     return;
   }
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
-      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
-      <p>${message}</p>
-      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
-    </div>`;
+  const html = buildEmailHtml({
+    preheader: message,
+    title,
+    introHtml: `<p style="margin:0;">${message}</p>${order.order_number ? `<p style="margin:14px 0 0;color:#6f6963;font-size:13.5px;">Pedido <strong>${order.order_number}</strong></p>` : ''}`,
+    noteHtml: 'Qualquer novidade sobre a entrega, avisamos por aqui.',
+    ctaLabel: 'Ver minha conta',
+    ctaUrl: SITE_URL
+  });
 
   try {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {

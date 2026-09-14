@@ -38,26 +38,22 @@
        BREVO_SENDER_EMAIL -> mesmo e-mail remetente verificado no Brevo
 */
 
+import { buildEmailHtml, buildOrderItemsHtml, SITE_URL } from './email-template.js';
+
 async function sendOrderConfirmationEmail(order) {
   const apiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL;
   if (!apiKey || !senderEmail || !order || !order.email) return;
 
-  const itemsHtml = (order.items || [])
-    .map(item => `<tr>
-        <td style="padding:6px 0;">${item.qty}x ${item.name}${item.color || item.size ? ` (${[item.color, item.size].filter(Boolean).join(' · ')})` : ''}</td>
-        <td style="padding:6px 0;text-align:right;">R$ ${(item.price * item.qty).toFixed(2).replace('.', ',')}</td>
-      </tr>`)
-    .join('');
-
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
-      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
-      <p>Recebemos a confirmação do seu pagamento via Pix do pedido <strong>${order.order_number || ''}</strong>!</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${itemsHtml}</table>
-      <p><strong>Total: R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</strong></p>
-      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
-    </div>`;
+  const html = buildEmailHtml({
+    preheader: `Pagamento via Pix confirmado para o pedido ${order.order_number || ''}.`,
+    title: 'Pagamento via Pix confirmado! ✅',
+    introHtml: `<p style="margin:0;">Recebemos a confirmação do seu pagamento via Pix do pedido <strong>${order.order_number || ''}</strong>.</p>`,
+    extraHtml: buildOrderItemsHtml(order),
+    noteHtml: 'Você recebe um novo aviso assim que o pedido for enviado.',
+    ctaLabel: 'Acompanhar meu pedido',
+    ctaUrl: SITE_URL
+  });
 
   try {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {

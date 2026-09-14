@@ -7,11 +7,17 @@
    Este endpoint recebe {name, email} depois que o cadastro no Supabase deu
    certo e manda o e-mail de boas-vindas por aqui.
 
+   O visual (logo, botão, rodapé) vem de api/email-template.js — é o mesmo
+   "casco" usado pelos outros e-mails (pedido recebido, pagamento aprovado,
+   status de entrega). Aqui só definimos a mensagem específica de boas-vindas.
+
    Variáveis de ambiente necessárias (já devem existir, usadas também em
    process-payment.js):
      BREVO_API_KEY
      BREVO_SENDER_EMAIL
 */
+
+import { buildEmailHtml, SITE_URL } from './email-template.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,13 +44,17 @@ export default async function handler(req, res) {
 
     const firstName = (name || '').split(' ')[0] || '';
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
-        <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
-        <p>Oi${firstName ? ' ' + firstName : ''}! Seu cadastro foi feito com sucesso 🎉</p>
-        <p>Agora você já pode acompanhar seus pedidos e endereços direto na sua conta.</p>
-        <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
-      </div>`;
+    const html = buildEmailHtml({
+      preheader: 'Seu cadastro foi confirmado — bem-vinda à MUV FITNESS!',
+      title: `Bem-vinda${firstName ? ', ' + firstName : ''}! 🎉`,
+      introHtml: `
+        <p style="margin:0 0 14px;">Seu cadastro na <strong>MUV FITNESS</strong> foi feito com sucesso.</p>
+        <p style="margin:0;">A partir de agora você pode acompanhar seus pedidos, salvar endereços e finalizar suas compras muito mais rápido, direto na sua conta.</p>
+      `,
+      noteHtml: 'Qualquer dúvida sobre o site ou sobre um pedido, é só chamar a gente.',
+      ctaLabel: 'Conhecer a coleção',
+      ctaUrl: SITE_URL
+    });
 
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -56,8 +66,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         sender: { name: 'MUV FITNESS', email: senderEmail },
         replyTo: { name: 'MUV FITNESS', email: 'muvfiitness@gmail.com' },
-        to: [{ email }],
-        subject: 'Bem-vinda à MUV FITNESS!',
+        to: [{ email, name: name || undefined }],
+        subject: 'Bem-vinda à MUV FITNESS! 🎉',
         htmlContent: html
       })
     });

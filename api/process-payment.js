@@ -34,6 +34,8 @@
                             os e-mails simplesmente não são enviados.
 */
 
+import { buildEmailHtml, buildOrderItemsHtml, SITE_URL } from './email-template.js';
+
 async function sendBrevoEmail({ to, subject, html }) {
   const apiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL;
@@ -63,26 +65,18 @@ async function sendBrevoEmail({ to, subject, html }) {
   }
 }
 
-function buildItemsHtml(order) {
-  return (order.items || [])
-    .map(item => `<tr>
-        <td style="padding:6px 0;">${item.qty}x ${item.name}${item.color || item.size ? ` (${[item.color, item.size].filter(Boolean).join(' · ')})` : ''}</td>
-        <td style="padding:6px 0;text-align:right;">R$ ${(item.price * item.qty).toFixed(2).replace('.', ',')}</td>
-      </tr>`)
-    .join('');
-}
-
 async function sendOrderPlacedEmail(order) {
   if (!order || !order.email) return;
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
-      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
-      <p>Recebemos seu pedido <strong>${order.orderNumber || ''}</strong> e já estamos processando o pagamento!</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${buildItemsHtml(order)}</table>
-      <p><strong>Total: R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</strong></p>
-      <p style="color:#666;font-size:13px;margin-top:24px;">Assim que o pagamento for confirmado, avisamos por aqui. Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
-    </div>`;
+  const html = buildEmailHtml({
+    preheader: `Recebemos seu pedido ${order.orderNumber || ''} e já estamos cuidando dele.`,
+    title: 'Recebemos seu pedido!',
+    introHtml: `<p style="margin:0;">Recebemos seu pedido <strong>${order.orderNumber || ''}</strong> e já estamos processando o pagamento.</p>`,
+    extraHtml: buildOrderItemsHtml(order),
+    noteHtml: 'Assim que o pagamento for confirmado, avisamos por aqui e você também pode acompanhar tudo em "Meus pedidos", na sua conta.',
+    ctaLabel: 'Acompanhar meu pedido',
+    ctaUrl: SITE_URL
+  });
 
   await sendBrevoEmail({
     to: order.email,
@@ -94,14 +88,15 @@ async function sendOrderPlacedEmail(order) {
 async function sendOrderConfirmationEmail(order) {
   if (!order || !order.email) return;
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
-      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
-      <p>Recebemos seu pedido <strong>${order.orderNumber || ''}</strong> e o pagamento foi aprovado!</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">${buildItemsHtml(order)}</table>
-      <p><strong>Total: R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</strong></p>
-      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
-    </div>`;
+  const html = buildEmailHtml({
+    preheader: `Pagamento aprovado! Seu pedido ${order.orderNumber || ''} já está confirmado.`,
+    title: 'Pagamento aprovado! ✅',
+    introHtml: `<p style="margin:0;">Seu pedido <strong>${order.orderNumber || ''}</strong> foi confirmado e já vai seguir para separação.</p>`,
+    extraHtml: buildOrderItemsHtml(order),
+    noteHtml: 'Você recebe um novo aviso assim que o pedido for enviado.',
+    ctaLabel: 'Acompanhar meu pedido',
+    ctaUrl: SITE_URL
+  });
 
   await sendBrevoEmail({
     to: order.email,
