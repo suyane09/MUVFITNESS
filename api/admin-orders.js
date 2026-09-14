@@ -88,6 +88,7 @@ async function sendStatusUpdateEmail(order, status) {
       },
       body: JSON.stringify({
         sender: { name: 'MUV FITNESS', email: senderEmail },
+        replyTo: { name: 'MUV FITNESS', email: 'muvfiitness@gmail.com' },
         to: [{ email: order.email }],
         subject,
         htmlContent: html

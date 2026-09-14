@@ -49,6 +49,7 @@ async function sendBrevoEmail({ to, subject, html }) {
       },
       body: JSON.stringify({
         sender: { name: 'MUV FITNESS', email: senderEmail },
+        replyTo: { name: 'MUV FITNESS', email: 'muvfiitness@gmail.com' },
         to: [{ email: to }],
         subject,
         htmlContent: html

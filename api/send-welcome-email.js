@@ -55,6 +55,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         sender: { name: 'MUV FITNESS', email: senderEmail },
+        replyTo: { name: 'MUV FITNESS', email: 'muvfiitness@gmail.com' },
         to: [{ email }],
         subject: 'Bem-vinda à MUV FITNESS!',
         htmlContent: html

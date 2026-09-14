@@ -69,6 +69,7 @@ async function sendOrderConfirmationEmail(order) {
       },
       body: JSON.stringify({
         sender: { name: 'MUV FITNESS', email: senderEmail },
+        replyTo: { name: 'MUV FITNESS', email: 'muvfiitness@gmail.com' },
         to: [{ email: order.email }],
         subject: `Pedido ${order.order_number || ''} confirmado - MUV FITNESS`,
         htmlContent: html
