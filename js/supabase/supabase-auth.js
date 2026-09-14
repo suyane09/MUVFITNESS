@@ -90,7 +90,28 @@
       password,
       options: { data: { name } }
     });
-    if (error) throw error;
+
+    if (error) {
+      // Com a confirmação de e-mail DESLIGADA no projeto, o Supabase avisa
+      // um e-mail duplicado assim, com essa mensagem em inglês.
+      if (/already registered/i.test(error.message || '')) {
+        throw new Error('Este e-mail já está cadastrado. Faça login ou use "Esqueci minha senha".');
+      }
+      throw error;
+    }
+
+    // Com a confirmação de e-mail LIGADA, o Supabase não lança erro pra um
+    // e-mail que já existe — de propósito, pra ninguém conseguir "advinhar"
+    // quais e-mails estão cadastrados testando o formulário de cadastro.
+    // Em vez de erro, ele devolve um usuário "fake"/ofuscado, sem sessão e
+    // com identities vazio. Sem este check, a gente mostrava "conta criada
+    // com sucesso" e mandava e-mail de boas-vindas de novo pra quem já
+    // tinha conta — exatamente o problema relatado (5 "cadastros" com o
+    // mesmo e-mail, sem nenhum aviso).
+    const isDuplicate = data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0;
+    if (isDuplicate) {
+      throw new Error('Este e-mail já está cadastrado. Faça login ou use "Esqueci minha senha".');
+    }
 
     // Se a confirmação de e-mail estiver desligada no projeto, já existe
     // sessão aqui e conseguimos gravar o perfil imediatamente. Se estiver
