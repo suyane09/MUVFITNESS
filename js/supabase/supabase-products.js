@@ -43,6 +43,12 @@
       stock: Number(r.stock) || 0,
       sku: m.sku || '',
       tag: m.tag || '',
+      weight: Number(m.weight) || 0,
+      dimensions: {
+        height: Number(m.dimensions && m.dimensions.height) || 0,
+        width: Number(m.dimensions && m.dimensions.width) || 0,
+        length: Number(m.dimensions && m.dimensions.length) || 0
+      },
       description: r.description || '',
       active: r.active !== false,
       novidade: !!m.novidade,
@@ -71,6 +77,12 @@
         subcat: p.subcat || '',
         sku: p.sku || '',
         tag: p.tag || '',
+        weight: Number(p.weight) || 0,
+        dimensions: {
+          height: Number(p.dimensions && p.dimensions.height) || 0,
+          width: Number(p.dimensions && p.dimensions.width) || 0,
+          length: Number(p.dimensions && p.dimensions.length) || 0
+        },
         novidade: !!p.novidade,
         colors: Array.isArray(p.colors) ? p.colors : [],
         sizes: Array.isArray(p.sizes) ? p.sizes : [],

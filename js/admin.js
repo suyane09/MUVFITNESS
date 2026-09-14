@@ -888,6 +888,10 @@ function openProductModal(id){
     document.getElementById('pfStock').value = p.stock;
     document.getElementById('pfSku').value = p.sku||'';
     document.getElementById('pfTag').value = p.tag||'';
+    document.getElementById('pfWeight').value = p.weight||'';
+    document.getElementById('pfHeight').value = (p.dimensions&&p.dimensions.height)||'';
+    document.getElementById('pfWidth').value = (p.dimensions&&p.dimensions.width)||'';
+    document.getElementById('pfLength').value = (p.dimensions&&p.dimensions.length)||'';
     document.getElementById('pfDescription').value = p.description||'';
     document.getElementById('pfActive').checked = !!p.active;
     document.getElementById('pfNovidade').checked = !!p.novidade;
@@ -981,6 +985,12 @@ document.getElementById('productForm').addEventListener('submit', function(e){
     stock: stockValue,
     sku: document.getElementById('pfSku').value.trim(),
     tag: document.getElementById('pfTag').value,
+    weight: parseInt(document.getElementById('pfWeight').value)||0,
+    dimensions: {
+      height: parseInt(document.getElementById('pfHeight').value)||0,
+      width: parseInt(document.getElementById('pfWidth').value)||0,
+      length: parseInt(document.getElementById('pfLength').value)||0
+    },
     description: document.getElementById('pfDescription').value.trim(),
     active: document.getElementById('pfActive').checked,
     novidade: document.getElementById('pfNovidade').checked,

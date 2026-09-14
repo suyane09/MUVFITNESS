@@ -471,6 +471,16 @@
             </select>
           </div>
           <div class="field full">
+            <label>Peso e dimensões (para calcular o frete)</label>
+            <div class="pf-variant-add-row">
+              <input type="number" id="pfWeight" min="1" step="1" placeholder="Peso (g)">
+              <input type="number" id="pfHeight" min="1" step="1" placeholder="Altura (cm)">
+              <input type="number" id="pfWidth" min="1" step="1" placeholder="Largura (cm)">
+              <input type="number" id="pfLength" min="1" step="1" placeholder="Comprimento (cm)">
+            </div>
+            <div class="field-hint" style="margin-top:8px;">Medidas da embalagem já fechada (não do produto sozinho). Usadas para calcular o frete real por CEP no checkout.</div>
+          </div>
+          <div class="field full">
             <label>Cores disponíveis</label>
             <div class="pf-variant-add-row">
               <input type="color" id="pfColorHex" value="#cccccc" title="Escolher cor">
