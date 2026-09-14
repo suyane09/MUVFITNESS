@@ -13,8 +13,6 @@ const KEYS = {
   products: 'muv_admin_products',
   coupons: 'muv_admin_coupons',
   settings: 'muv_admin_settings',
-  creds: 'muv_admin_creds',
-  session: 'muv_admin_session',
   customersMeta: 'muv_admin_customers_meta',
   showcaseCards: 'muv_showcase_cards',
   // shared with storefront (index_10.html)
@@ -77,9 +75,6 @@ if(!coupons){ coupons = seedCoupons(); LS.set(KEYS.coupons, coupons); }
 
 let settings = LS.get(KEYS.settings, null);
 if(!settings){ settings = seedSettings(); LS.set(KEYS.settings, settings); }
-
-let creds = LS.get(KEYS.creds, null);
-if(!creds){ creds = {user:'admin', pass:'muv2026'}; LS.set(KEYS.creds, creds); }
 
 /* -----------------------------------------------------------------------
    PEDIDOS REAIS (Supabase)
@@ -198,39 +193,90 @@ document.querySelectorAll('.modal-overlay').forEach(ov=>{
 
 /* =========================================================
    LOGIN
+   Agora validado no servidor (/api/admin/login, /api/admin/session,
+   /api/admin/logout), com sessão protegida por cookie httpOnly.
+   Nada de usuário/senha fica salvo no navegador.
 ========================================================= */
 const loginScreen = document.getElementById('loginScreen');
 const appEl = document.getElementById('app');
 
-function isLoggedIn(){ return sessionStorage.getItem(KEYS.session) === '1'; }
+let loggedIn = false;
+let currentAdminUser = '';
+
+function isLoggedIn(){ return loggedIn; }
+
 function enterApp(){
   loginScreen.style.display = 'none';
   appEl.classList.add('visible');
-  document.getElementById('sideUserName').textContent = creds.user;
-  document.getElementById('sideAvatar').textContent = creds.user.slice(0,1).toUpperCase();
+  document.getElementById('sideUserName').textContent = currentAdminUser || 'Admin';
+  document.getElementById('sideAvatar').textContent = (currentAdminUser || 'A').slice(0,1).toUpperCase();
   renderAll();
 }
 
-document.getElementById('loginForm').addEventListener('submit', function(e){
+function showLoginScreen(){
+  loggedIn = false;
+  appEl.classList.remove('visible');
+  loginScreen.style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+
+// Ao carregar a página, pergunta pro servidor se já existe sessão válida
+// (cookie ainda não expirou), em vez de confiar em algo salvo no navegador.
+async function checkSession(){
+  try{
+    const res = await fetch('/api/admin/session', { credentials:'include' });
+    if(res.ok){
+      let data = {};
+      try{ data = await res.json(); }catch(err){ /* corpo vazio é ok */ }
+      currentAdminUser = (data && data.user) || 'Admin';
+      loggedIn = true;
+      enterApp();
+      // Depois de recarregar a página (ex.: após salvar um produto), volta pra
+      // aba em que a pessoa estava, em vez de sempre cair no Dashboard.
+      const lastView = sessionStorage.getItem('muv_admin_last_view');
+      if(lastView && document.getElementById('view-'+lastView)) goView(lastView);
+    } else {
+      showLoginScreen();
+    }
+  }catch(err){
+    showLoginScreen();
+  }
+}
+
+document.getElementById('loginForm').addEventListener('submit', async function(e){
   e.preventDefault();
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
-  const c = LS.get(KEYS.creds, creds);
-  if(u === c.user && p === c.pass){
-    sessionStorage.setItem(KEYS.session, '1');
-    document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+
+  try{
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+
+    if(!res.ok){
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+
+    currentAdminUser = u;
+    loggedIn = true;
     enterApp();
-  } else {
+  }catch(err){
     document.getElementById('loginError').style.display = 'block';
   }
 });
 
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
-  askConfirm('Sair do painel?', 'Você precisará entrar novamente com usuário e senha.', ()=>{
-    sessionStorage.removeItem(KEYS.session);
-    appEl.classList.remove('visible');
-    loginScreen.style.display = 'flex';
-    document.getElementById('loginPass').value = '';
+  askConfirm('Sair do painel?', 'Você precisará entrar novamente com usuário e senha.', async ()=>{
+    try{
+      await fetch('/api/admin/logout', { method:'POST', credentials:'include' });
+    } finally {
+      showLoginScreen();
+    }
   });
 });
 
@@ -1302,7 +1348,7 @@ function renderSettings(){
   document.getElementById('setStoreEmail').value = settings.storeEmail||'';
   document.getElementById('setStorePhone').value = settings.storePhone||'';
   document.getElementById('setFreeShipping').value = settings.freeShipping||0;
-  document.getElementById('setAdminUser').value = creds.user||'';
+  document.getElementById('setAdminUser').value = currentAdminUser||'';
   document.getElementById('setAdminPass').value = '';
 }
 
@@ -1318,15 +1364,10 @@ document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('saveAccountBtn').addEventListener('click', ()=>{
-  const u = document.getElementById('setAdminUser').value.trim();
-  const p = document.getElementById('setAdminPass').value;
-  if(!u){ showToast('Informe um usuário válido.'); return; }
-  creds = {user:u, pass: p ? p : creds.pass};
-  LS.set(KEYS.creds, creds);
-  document.getElementById('sideUserName').textContent = creds.user;
-  document.getElementById('sideAvatar').textContent = creds.user.slice(0,1).toUpperCase();
-  document.getElementById('setAdminPass').value = '';
-  showToast('Dados de acesso atualizados.');
+  // Usuário e senha do admin agora são validados no servidor, então não dá
+  // mais pra trocá-los por aqui. Isso precisa de um endpoint próprio
+  // (ex.: PATCH /api/admin/account) que ainda não existe.
+  showToast('Troca de usuário/senha agora é feita no servidor. Peça ao time técnico para atualizar as credenciais (veja README-SEGURANCA.md).');
 });
 
 document.getElementById('exportDataBtn').addEventListener('click', ()=>{
@@ -1421,15 +1462,6 @@ setInterval(()=>{
    (fica por último de propósito: por aqui, todas as variáveis
    e funções usadas pelas telas já existem e foram inicializadas)
 ========================================================= */
-if(isLoggedIn()){
-  try{
-    enterApp();
-    // Depois de recarregar a página (ex.: após salvar um produto), volta pra
-    // aba em que a pessoa estava, em vez de sempre cair no Dashboard.
-    const lastView = sessionStorage.getItem('muv_admin_last_view');
-    if(lastView && document.getElementById('view-'+lastView)) goView(lastView);
-  }
-  catch(err){ console.error('[MUV admin] erro ao entrar no painel:', err); }
-}
+checkSession();
 
 })();
