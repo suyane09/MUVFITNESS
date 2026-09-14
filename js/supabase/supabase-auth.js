@@ -23,6 +23,14 @@
      saveAddress(data, id)      -> upsert; sem id = cria novo
      deleteAddress(id)
      setDefaultAddress(id)
+
+   E-mail de boas-vindas (Brevo):
+     A API key do Brevo é secreta e não pode ficar aqui (arquivo que roda no
+     navegador da cliente). Por isso, depois que o cadastro no Supabase dá
+     certo, chamamos /api/send-welcome-email (servidor) passando só nome e
+     e-mail — quem manda o e-mail de fato é aquele endpoint. Se essa chamada
+     falhar por qualquer motivo, o cadastro continua funcionando normalmente
+     (só não sai o e-mail).
 */
 (function () {
   'use strict';
@@ -63,6 +71,15 @@
     return 'MUV' + Date.now().toString().slice(-8);
   }
 
+  function sendWelcomeEmail(name, email) {
+    // Fogo-e-esquece: não bloqueia o cadastro nem lança erro pra cliente.
+    fetch('/api/send-welcome-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    }).catch(() => { /* falha silenciosa — o cadastro já foi feito */ });
+  }
+
   // -------------------------------------------------------
   // AUTH
   // -------------------------------------------------------
@@ -81,6 +98,11 @@
     if (data.user && data.session) {
       await client.from('profiles').upsert({ id: data.user.id, name, email });
     }
+
+    if (data.user) {
+      sendWelcomeEmail(name, email);
+    }
+
     return data;
   }
 

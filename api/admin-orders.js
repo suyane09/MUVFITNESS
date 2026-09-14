@@ -28,11 +28,78 @@
                                     reaproveite a senha de login do admin, e
                                     nunca coloque esse valor no código/git —
                                     só na Vercel.
+     BREVO_API_KEY              -> mesma API key usada em process-payment.js
+     BREVO_SENDER_EMAIL         -> mesmo e-mail remetente verificado no Brevo
 
    Depois de configurar, na primeira vez que abrir o admin e entrar no
    painel, o navegador vai pedir pra colar essa mesma chave (uma vez só,
    fica salva no próprio navegador do admin).
+
+   E-mail de status (Brevo):
+     Toda vez que o admin muda o status de um pedido (PATCH), a gente olha o
+     texto do novo status e, se ele falar de "separação", "enviado" ou
+     "entregue", manda um e-mail avisando a cliente. Outros status (tipo os
+     automáticos "Pagamento aprovado/pendente" que vêm do webhook) não geram
+     e-mail aqui — esses já são tratados em mercadopago-webhook.js.
+
+     IMPORTANTE: os textos abaixo (ex.: 'separa', 'envi', 'entreg') precisam
+     bater com o que o painel admin realmente envia como status. Se o
+     dropdown do admin.html usar palavras diferentes (ex.: "A caminho" em vez
+     de "Enviado"), ajuste as condições da função sendStatusUpdateEmail.
 */
+
+async function sendStatusUpdateEmail(order, status) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!apiKey || !senderEmail || !order || !order.email || !status) return;
+
+  const statusLower = String(status).toLowerCase();
+  let subject;
+  let message;
+
+  if (statusLower.includes('separa')) {
+    subject = `Seu pedido ${order.order_number || ''} está em separação - MUV FITNESS`;
+    message = 'Seu pedido já está sendo separado com carinho pela nossa equipe!';
+  } else if (statusLower.includes('envi') || statusLower.includes('caminho') || statusLower.includes('transport')) {
+    subject = `Seu pedido ${order.order_number || ''} saiu para entrega - MUV FITNESS`;
+    message = 'Seu pedido já saiu para entrega e deve chegar em breve!';
+  } else if (statusLower.includes('entreg')) {
+    subject = `Seu pedido ${order.order_number || ''} foi entregue - MUV FITNESS`;
+    message = 'Seu pedido foi entregue! Esperamos que você ame os produtos.';
+  } else {
+    // Status sem e-mail configurado (ex.: os automáticos do webhook de pagamento)
+    return;
+  }
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+      <h2 style="font-family:Georgia,serif;">MUV FITNESS</h2>
+      <p>${message}</p>
+      <p style="color:#666;font-size:13px;margin-top:24px;">Qualquer dúvida, fale com a gente pelo WhatsApp: https://wa.me/5582982143150</p>
+    </div>`;
+
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'api-key': apiKey
+      },
+      body: JSON.stringify({
+        sender: { name: 'MUV FITNESS', email: senderEmail },
+        to: [{ email: order.email }],
+        subject,
+        htmlContent: html
+      })
+    });
+    if (!r.ok) {
+      console.error('[MUV e-mail] erro ao enviar atualização de status:', await r.text());
+    }
+  } catch (err) {
+    console.error('[MUV e-mail] erro inesperado ao enviar atualização de status:', err);
+  }
+}
 
 export default async function handler(req, res) {
   const adminKey = process.env.ADMIN_ORDERS_KEY;
@@ -98,6 +165,11 @@ export default async function handler(req, res) {
         res.status(502).json({ error: 'Erro ao atualizar pedido no Supabase.' });
         return;
       }
+
+      // Dispara o e-mail de status pra cliente, sem travar a resposta pro admin.
+      const orderRow = Array.isArray(data) ? data[0] : data;
+      if (orderRow) sendStatusUpdateEmail(orderRow, status);
+
       res.status(200).json(data);
       return;
     }
