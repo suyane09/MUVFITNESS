@@ -362,9 +362,6 @@
       </div>
       <div class="pp-info">
         <h1 id="ppTitle"></h1>
-        <div class="pp-rating">
-          <span>☆ ☆ ☆ ☆ ☆</span><span id="ppReviews">0 (0 Avaliações)</span>
-        </div>
         <div class="pp-price" id="ppPrice"></div>
         <div class="pp-install" id="ppInstall"></div>
         <div class="pp-option-group" id="ppColorGroup" style="display:none;">
@@ -388,6 +385,20 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="pp-reviews" id="ppReviewsSection">
+      <h2 class="pp-reviews-title">Avaliações das clientes</h2>
+      <div class="pp-reviews-list" id="ppReviewsList">
+        <p class="pp-reviews-empty">Seja a primeira a comentar sobre esta peça.</p>
+      </div>
+      <form class="pp-review-form" id="ppReviewForm" novalidate>
+        <h3>Deixe seu comentário</h3>
+        <div class="pp-review-form-status" id="ppReviewStatus" role="status" aria-live="polite"></div>
+        <input type="text" id="ppReviewName" placeholder="Seu nome" maxlength="60" required>
+        <textarea id="ppReviewText" placeholder="Conte como foi sua experiência com o produto..." maxlength="600" required></textarea>
+        <button type="submit" class="pp-review-submit" id="ppReviewSubmit">Enviar comentário</button>
+      </form>
     </div>
   </div>
 </section>
@@ -722,5 +733,6 @@
 <script src="/js/supabase/supabase-auth.js?v=4"></script>
 <script src="/js/supabase/supabase-products.js?v=4"></script>
 <script src="/js/supabase/supabase-site-settings.js?v=4"></script>
+<script src="/js/supabase/supabase-reviews.js?v=1"></script>
 </body>
 </html>

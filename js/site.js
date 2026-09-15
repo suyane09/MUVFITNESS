@@ -444,6 +444,12 @@
   const ppStockNote = document.getElementById('ppStockNote');
   const ppAddBtn = document.getElementById('ppAddBtn');
   const ppBackLink = document.getElementById('ppBackLink');
+  const ppReviewsList = document.getElementById('ppReviewsList');
+  const ppReviewForm = document.getElementById('ppReviewForm');
+  const ppReviewName = document.getElementById('ppReviewName');
+  const ppReviewText = document.getElementById('ppReviewText');
+  const ppReviewSubmit = document.getElementById('ppReviewSubmit');
+  const ppReviewStatus = document.getElementById('ppReviewStatus');
   let currentPdpId = null;
   let currentPdpColor = '';
   let currentPdpSize = '';
@@ -490,6 +496,84 @@
       ppStockNote.textContent = '';
       ppAddBtn.disabled = false;
     }
+  }
+
+  function formatReviewDate(iso){
+    try {
+      return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch (err) { return ''; }
+  }
+
+  function renderReviews(list){
+    if (!ppReviewsList) return;
+    if (!list || !list.length){
+      ppReviewsList.innerHTML = '<p class="pp-reviews-empty">Seja a primeira a comentar sobre esta peça.</p>';
+      return;
+    }
+    const sanitize = window.MUV_REVIEWS_SANITIZE || (t => t);
+    ppReviewsList.innerHTML = list.map(r => `
+      <div class="pp-review-item">
+        <div class="pp-review-head">
+          <span class="pp-review-name">${sanitize(r.customer_name)}</span>
+          <span class="pp-review-date">${formatReviewDate(r.created_at)}</span>
+        </div>
+        <div class="pp-review-text">${sanitize(r.comment)}</div>
+      </div>
+    `).join('');
+  }
+
+  async function loadReviewsForProduct(id){
+    if (!ppReviewsList || !window.MUV_REVIEWS_LOAD) return;
+    ppReviewsList.innerHTML = '<p class="pp-reviews-empty">Carregando comentários…</p>';
+    try {
+      const list = await window.MUV_REVIEWS_LOAD(id);
+      if (currentPdpId === id) renderReviews(list);
+    } catch (err) {
+      console.error('[MUV reviews]', err);
+      if (currentPdpId === id) {
+        ppReviewsList.innerHTML = '<p class="pp-reviews-empty">Não foi possível carregar os comentários agora.</p>';
+      }
+    }
+  }
+
+  if (ppReviewForm){
+    ppReviewForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentPdpId) return;
+      const name = ppReviewName.value.trim();
+      const comment = ppReviewText.value.trim();
+      ppReviewStatus.textContent = '';
+      ppReviewStatus.className = 'pp-review-form-status';
+
+      if (!name || !comment){
+        ppReviewStatus.textContent = 'Preencha seu nome e o comentário antes de enviar.';
+        ppReviewStatus.classList.add('error');
+        return;
+      }
+      if (!window.MUV_REVIEWS_ADD){
+        ppReviewStatus.textContent = 'Não foi possível enviar o comentário agora. Tente novamente em instantes.';
+        ppReviewStatus.classList.add('error');
+        return;
+      }
+
+      ppReviewSubmit.disabled = true;
+      ppReviewSubmit.textContent = 'Enviando…';
+      try {
+        const productIdAtSubmit = currentPdpId;
+        await window.MUV_REVIEWS_ADD(productIdAtSubmit, name, comment);
+        if (currentPdpId === productIdAtSubmit) await loadReviewsForProduct(productIdAtSubmit);
+        ppReviewForm.reset();
+        ppReviewStatus.textContent = 'Comentário enviado. Obrigada por avaliar!';
+        ppReviewStatus.classList.add('success');
+      } catch (err) {
+        console.error('[MUV reviews]', err);
+        ppReviewStatus.textContent = 'Não foi possível enviar seu comentário. Tente novamente.';
+        ppReviewStatus.classList.add('error');
+      } finally {
+        ppReviewSubmit.disabled = false;
+        ppReviewSubmit.textContent = 'Enviar comentário';
+      }
+    });
   }
 
   function openProductDetail(id, opts){
@@ -562,6 +646,10 @@
     }
 
     updatePdpStockNote();
+
+    if (ppReviewForm) ppReviewForm.reset();
+    if (ppReviewStatus) { ppReviewStatus.textContent = ''; ppReviewStatus.className = 'pp-review-form-status'; }
+    loadReviewsForProduct(id);
 
     mainContent.classList.add('hidden');
     categoryPage.classList.remove('active');
