@@ -156,6 +156,9 @@
       if (novGrid && novSection) {
         novGrid.innerHTML = novidadesHtml.join('');
         novSection.style.display = '';
+        // libera os links "Novidades" do menu/drawer/pílulas, que ficam
+        // escondidos enquanto não houver nenhum produto marcado como novidade
+        document.querySelectorAll('.nov-link').forEach(function(el){ el.style.display = ''; });
       }
     }
   } catch (e) {
@@ -741,6 +744,7 @@
     'conjuntos:calca': 'Conjunto Calça',
     'macacoes': 'Macacão',
     'blusa': 'Blusa',
+    'novidades': 'Novidades',
     'todos': 'Todos os produtos'
   };
 
@@ -758,8 +762,23 @@
       .replace(/[\u0300-\u036f]/g, '');
   }
 
+  // Um produto marcado como novidade aparece em duas vitrines (a da sua
+  // categoria e a de Novidades), então some duas vezes no índice PRODUCTS.
+  // Nas listagens que cruzam seções, mantemos só a primeira ocorrência.
+  function dedupeById(list){
+    const seen = new Set();
+    return list.filter(p => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }
+
   function getCategoryBaseList(key){
-    if (key === 'todos') return PRODUCTS.filter(p => p.section !== 'bestseller');
+    // "Novidades" reúne os produtos que a loja marcou como novidade no painel.
+    // Esses cards vivem na vitrine #painelProducts, então basta filtrar por ela.
+    if (key === 'novidades') return dedupeById(PRODUCTS.filter(p => p.section === 'painelProducts'));
+    if (key === 'todos') return dedupeById(PRODUCTS.filter(p => p.section !== 'bestseller'));
     const [section, subcat] = key.split(':');
     let list = PRODUCTS.filter(p => p.section === section);
     if (subcat) list = list.filter(p => normalizeSubcat(p.subcat) === normalizeSubcat(subcat));
