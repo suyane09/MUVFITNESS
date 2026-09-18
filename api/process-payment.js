@@ -25,6 +25,10 @@
        paga o QR Code — nesse caso quem manda esse e-mail é o webhook
        (api/mercadopago-webhook.js), quando a confirmação chegar. Isso evita
        mandar e-mail de aprovação duplicado pro mesmo pedido.
+     - Os dois envios usam `await`: em ambiente serverless (Vercel) a função
+       pode ser encerrada assim que a resposta HTTP é mandada, e isso corta
+       no meio qualquer fetch ainda em andamento — inclusive o do Brevo. Sem
+       o await, o e-mail às vezes era enviado pela metade ou nem saía.
 
    Variáveis de ambiente necessárias (Vercel -> Settings -> Environment
    Variables), além de MP_ACCESS_TOKEN:
@@ -132,8 +136,12 @@ export default async function handler(req, res) {
     const orderNumber = 'MUV' + Date.now().toString().slice(-8);
 
     // Avisa a cliente na hora que o pedido chegou, antes de saber o
-    // resultado do pagamento. Não travamos a resposta esperando o e-mail.
-    sendOrderPlacedEmail({ ...order, orderNumber });
+    // resultado do pagamento.
+    // IMPORTANTE: usar await aqui. Em ambiente serverless (Vercel), a função
+    // pode ser encerrada assim que a resposta HTTP é enviada, cortando no
+    // meio um fetch ainda "em voo" — sem o await, o e-mail às vezes nem
+    // chegava a ser enviado por completo.
+    await sendOrderPlacedEmail({ ...order, orderNumber });
 
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const siteUrl = `${protocol}://${req.headers.host}`;
@@ -169,10 +177,23 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Log de diagnóstico: mesmo quando a chamada à API do Mercado Pago dá
+    // certo (mpRes.ok), o PAGAMENTO em si pode vir recusado (status
+    // "rejected"). Sem isso, uma recusa de cartão não deixava nenhum
+    // rastro nos logs da Vercel — cada tentativa fica registrada aqui,
+    // com o motivo detalhado (status_detail) explicando a recusa.
+    console.log('[MUV pagamento] resultado:', {
+      order_number: orderNumber,
+      status: data.status,
+      status_detail: data.status_detail,
+      payment_method_id: data.payment_method_id
+    });
+
     if (data.status === 'approved') {
-      // Não travamos a resposta esperando o e-mail — a cliente já vê o
-      // resultado aprovado na hora, o e-mail é disparado em paralelo.
-      sendOrderConfirmationEmail({ ...order, orderNumber, total: order?.total ?? data.transaction_amount });
+      // IMPORTANTE: usar await aqui pelo mesmo motivo do e-mail acima —
+      // sem isso, a função pode ser encerrada antes do fetch pro Brevo
+      // terminar e o e-mail de aprovação não sai.
+      await sendOrderConfirmationEmail({ ...order, orderNumber, total: order?.total ?? data.transaction_amount });
     }
 
     res.status(200).json({

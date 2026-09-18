@@ -36,6 +36,11 @@
      acima):
        BREVO_API_KEY      -> mesma API key usada em process-payment.js
        BREVO_SENDER_EMAIL -> mesmo e-mail remetente verificado no Brevo
+
+     O envio usa `await` antes de responder ao Mercado Pago: em ambiente
+     serverless (Vercel) a função pode ser encerrada assim que a resposta
+     HTTP é enviada, cortando no meio um fetch ainda em andamento — foi
+     esse o motivo do e-mail do Pix não estar chegando.
 */
 
 import { buildEmailHtml, buildOrderItemsHtml, SITE_URL } from './email-template.js';
@@ -166,8 +171,12 @@ export default async function handler(req, res) {
         }
         // Cartão já teve o e-mail disparado na hora em process-payment.js —
         // aqui só cobrimos o caso do Pix, que só aprova depois (assíncrono).
+        // IMPORTANTE: usar await aqui. Em ambiente serverless (Vercel), assim
+        // que a resposta HTTP é enviada a função pode ser encerrada, cortando
+        // no meio um fetch ainda "em voo" — sem o await, o e-mail às vezes
+        // nem chegava a sair.
         if (payment.payment_method_id === 'pix') {
-          sendOrderConfirmationEmail(orderRow);
+          await sendOrderConfirmationEmail(orderRow);
         }
       }
     }
