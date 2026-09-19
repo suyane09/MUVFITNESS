@@ -1499,6 +1499,12 @@
         if (el.id === 'coComplement' || el.id === 'coCountry') return;
         el.required = isShip;
       });
+      // Retirada: pede nome e telefone de quem vai retirar (na entrega, esses dados já vêm do endereço)
+      const pickupContact = document.getElementById('coPickupContact');
+      if (pickupContact){
+        pickupContact.classList.toggle('active', !isShip);
+        pickupContact.querySelectorAll('input').forEach(el => { el.required = !isShip; });
+      }
       renderCheckoutSummary();
     });
   });
@@ -1709,9 +1715,15 @@
   }
 
   function buildOrderPayload(selectedPaymentMethod){
+    const isShipOrder = coDeliveryMethod === 'ship';
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
     return {
       email: document.getElementById('coEmail').value,
       delivery: coDeliveryMethod,
+      // quem paga/retira (usado também pelo Mercado Pago pra analisar o pagamento)
+      contact: isShipOrder
+        ? { firstName: val('coFirstName'), lastName: val('coLastName'), phone: val('coPhone') }
+        : { firstName: val('coPickFirstName'), lastName: val('coPickLastName'), phone: val('coPickPhone') },
       address: coDeliveryMethod === 'ship' ? {
         firstName: document.getElementById('coFirstName').value,
         lastName: document.getElementById('coLastName').value,

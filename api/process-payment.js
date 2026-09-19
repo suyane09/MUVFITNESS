@@ -109,6 +109,70 @@ async function sendOrderConfirmationEmail(order) {
   });
 }
 
+/* Dados extras da compra pro Mercado Pago (additional_info + nome do pagador).
+   Quanto mais informação real da compra o Mercado Pago recebe (itens, nome,
+   telefone, endereço), mais fácil pro antifraude reconhecer uma compra legítima.
+   Tudo aqui é opcional: se algum dado faltar, simplesmente não é enviado, e
+   qualquer erro nesta montagem NÃO derruba o pagamento. */
+function onlyDigits(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
+
+function buildExtraPaymentData(order) {
+  const out = { additional_info: null, payerExtra: null };
+  try {
+    if (!order || typeof order !== 'object') return out;
+    const addr = order.address || null;
+    const contact = order.contact || (addr ? { firstName: addr.firstName, lastName: addr.lastName, phone: addr.phone } : null);
+    const info = {};
+
+    const items = (Array.isArray(order.items) ? order.items : [])
+      .filter(i => i && i.name && Number(i.price) > 0)
+      .map(i => ({
+        id: String(i.id || ''),
+        title: String(i.name).slice(0, 250),
+        description: [i.color, i.size ? 'Tam. ' + i.size : ''].filter(Boolean).join(' - ') || String(i.name).slice(0, 250),
+        category_id: 'fashion',
+        quantity: Math.max(1, parseInt(i.qty, 10) || 1),
+        unit_price: Number(i.price)
+      }));
+    if (items.length) info.items = items;
+
+    const payerInfo = {};
+    if (contact) {
+      const first = String(contact.firstName || '').trim();
+      const last = String(contact.lastName || '').trim();
+      if (first) payerInfo.first_name = first;
+      if (last) payerInfo.last_name = last;
+      let phone = onlyDigits(contact.phone);
+      if (phone.length > 11 && phone.startsWith('55')) phone = phone.slice(2);
+      if (phone.length >= 10) payerInfo.phone = { area_code: phone.slice(0, 2), number: phone.slice(2) };
+      if (payerInfo.first_name || payerInfo.last_name) {
+        out.payerExtra = { first_name: payerInfo.first_name, last_name: payerInfo.last_name };
+      }
+    }
+    if (addr && addr.street) {
+      payerInfo.address = {
+        zip_code: onlyDigits(addr.cep),
+        street_name: String(addr.street),
+        street_number: String(addr.number || '')
+      };
+      info.shipments = {
+        receiver_address: {
+          zip_code: onlyDigits(addr.cep),
+          state_name: String(addr.state || ''),
+          city_name: String(addr.city || ''),
+          street_name: String(addr.street),
+          street_number: String(addr.number || '')
+        }
+      };
+    }
+    if (Object.keys(payerInfo).length) info.payer = payerInfo;
+    if (Object.keys(info).length) out.additional_info = info;
+  } catch (err) {
+    console.error('[MUV pagamento] não foi possível montar os dados extras:', err);
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método não permitido.' });
@@ -140,8 +204,11 @@ export default async function handler(req, res) {
 
     // formData vem pronto do Brick (token, payment_method_id, installments,
     // payer, transaction_amount etc.) — só completamos com os dados do pedido.
+    const extra = buildExtraPaymentData(order);
     const paymentBody = {
       ...formData,
+      ...(extra.payerExtra ? { payer: { ...(formData.payer || {}), ...extra.payerExtra } } : {}),
+      ...(extra.additional_info ? { additional_info: extra.additional_info } : {}),
       external_reference: orderNumber,
       notification_url: `${siteUrl}/api/mercadopago-webhook`,
       statement_descriptor: 'MUVFITNESS',

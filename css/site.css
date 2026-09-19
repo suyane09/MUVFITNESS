@@ -791,3 +791,7 @@
 .prod-card .install{display:none;}
 .prod-size-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
 .prod-size-row span{border:1px solid var(--ink-soft);color:var(--ink-soft);font-size:11px;font-weight:500;line-height:1;padding:5px 8px;border-radius:3px;}
+
+/* Retirada na loja: nome e telefone de quem vai retirar */
+.co-pickup-contact{display:none;flex-direction:column;margin-top:14px;}
+.co-pickup-contact.active{display:flex;}
