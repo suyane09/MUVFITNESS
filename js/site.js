@@ -1856,10 +1856,20 @@
 
             const order = buildOrderPayload(selectedPaymentMethod);
 
+            // O security.js (carregado no index.html) gera um campo oculto
+            // #device_id com o fingerprint antifraude do navegador, mas NÃO
+            // inclui esse valor automaticamente no formData do Brick — por
+            // isso lemos aqui e mandamos junto pro backend, que repassa pro
+            // Mercado Pago no header X-meli-session-id (api/process-payment.js).
+            const deviceId = (document.getElementById('device_id') || {}).value || '';
+            if (!deviceId) {
+              console.warn('[MUV pagamento] device_id ainda não estava pronto no momento do envio.');
+            }
+
             fetch('/api/process-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ formData, order })
+              body: JSON.stringify({ formData: { ...formData, deviceId }, order })
             })
               .then(r => r.json())
               .then((data) => {
