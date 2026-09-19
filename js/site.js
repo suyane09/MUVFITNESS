@@ -629,6 +629,10 @@
     // size selector — hidden for accessories with no sizes cadastrados;
     // uses the sizes cadastrados no admin quando existirem, senão o padrão P/M/G.
     const sizeList = (p.sizes && p.sizes.length) ? p.sizes : (p.section === 'acessorios' ? [] : ['P', 'M', 'G']);
+    const ppMeasures = document.getElementById('ppMeasures');
+    const ppDetails = document.getElementById('ppDetails');
+    if (ppDetails) ppDetails.style.display = sizeList.length ? '' : 'none';
+    if (ppMeasures) ppMeasures.querySelectorAll('tr[data-size]').forEach(tr => tr.classList.remove('active'));
     if (!sizeList.length){
       ppSizeGroup.style.display = 'none';
     } else {
@@ -643,6 +647,7 @@
           btn.classList.add('active');
           currentPdpSize = btn.dataset.size;
           ppSizeValue.textContent = currentPdpSize;
+          document.querySelectorAll('#ppMeasures tr[data-size]').forEach(tr => tr.classList.toggle('active', tr.dataset.size === currentPdpSize));
           updatePdpStockNote();
         });
       });

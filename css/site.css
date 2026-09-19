@@ -759,3 +759,21 @@
 @media(max-height:480px) and (max-width:900px){
   .hero{height:auto;min-height:340px;padding:40px 0;}
 }
+/* ===== Product page: medidas + especificações ===== */
+.pp-details{margin-top:22px;border-top:1px solid var(--line);}
+.pp-acc{border-bottom:1px solid var(--line);padding:0;}
+.pp-acc summary{cursor:pointer;list-style:none;padding:16px 0;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;}
+.pp-acc summary::-webkit-details-marker{display:none;}
+.pp-acc summary::after{content:'+';font-size:18px;font-weight:400;color:var(--ink-soft);}
+.pp-acc[open] summary::after{content:'\2212';}
+.pp-size-table{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:13.5px;}
+.pp-size-table th,.pp-size-table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);}
+.pp-size-table th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;background:var(--bg);}
+.pp-size-table td:first-child{font-weight:700;}
+.pp-size-table tr.active td{background:var(--bg);font-weight:700;}
+.pp-specs{margin:0 0 16px;}
+.pp-specs > div{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.5;}
+.pp-specs > div:last-child{border-bottom:none;}
+.pp-specs dt{flex:0 0 118px;font-weight:600;color:var(--ink);}
+.pp-specs dd{margin:0;color:var(--ink-soft);}
+@media (max-width:520px){.pp-specs dt{flex-basis:96px;}}
