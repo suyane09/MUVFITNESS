@@ -6,7 +6,7 @@
    e na página de produto.
 
    Regra: cada produto aparece na CATEGORIA que foi escolhida no
-   cadastro (Conjuntos/Short, Conjuntos/Calça, Macacões, Blusas,
+   cadastro (Conjuntos/Short, Conjuntos/Calça, Macaquitos, Blusas,
    ou qualquer outra categoria criada no painel). Só entra também
    na vitrine "Novidades" da home se a pessoa marcar a opção
    "Mostrar em Novidades" no cadastro do produto.
@@ -776,7 +776,7 @@
 
   /* =========================================================
      CATEGORY PAGE (full page — Best Seller, Legging, Conjunto Short,
-     Conjunto Calça, Macacão, Blusa, Acessório, Todos os produtos)
+     Conjunto Calça, Macaquito, Blusa, Acessório, Todos os produtos)
   ========================================================= */
   const categoryPage = document.getElementById('categoryPage');
   const catCrumbName = document.getElementById('catCrumbName');
@@ -795,7 +795,7 @@
     'conjuntos': 'Conjuntos',
     'conjuntos:short': 'Conjunto Short',
     'conjuntos:calca': 'Conjunto Calça',
-    'macacoes': 'Macacão',
+    'macacoes': 'Macaquito',
     'blusa': 'Blusa',
     'novidades': 'Novidades',
     'todos': 'Todos os produtos'

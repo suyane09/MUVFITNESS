@@ -24,7 +24,7 @@ const KEYS = {
 
 const CATEGORIES = [
   {id:'conjuntos', name:'Conjuntos'},
-  {id:'macacoes', name:'Macacões'},
+  {id:'macacoes', name:'Macaquitos'},
   {id:'blusa', name:'Blusas'},
   {id:'shorts', name:'Shorts'},
   {id:'calcas', name:'Calças'},
@@ -45,7 +45,7 @@ function seedProducts(){
     {id:uid('p'), name:'Conjunto Drap', category:'conjuntos', subcat:'calca', price:199, oldPrice:0, stock:9, sku:'MUV-CJ-002', tag:'', description:'Conjunto de calça flare e top com recortes estratégicos.', image:'', active:true, createdAt:Date.now()-86400000*28},
     {id:uid('p'), name:'Conjunto Nice', category:'conjuntos', subcat:'short', price:189, oldPrice:229, stock:3, sku:'MUV-CJ-003', tag:'Novo', description:'Conjunto leve para treinos de alta intensidade.', image:'', active:true, createdAt:Date.now()-86400000*4},
     {id:uid('p'), name:'Conjunto Hit', category:'conjuntos', subcat:'calca', price:199, oldPrice:0, stock:0, sku:'MUV-CJ-004', tag:'', description:'Conjunto com tecido de compressão média.', image:'', active:true, createdAt:Date.now()-86400000*20},
-    {id:uid('p'), name:'Macacão Mom', category:'macacoes', subcat:'', price:234, oldPrice:0, stock:11, sku:'MUV-MC-001', tag:'', description:'Macacão modelagem mom, cintura alta.', image:'', active:true, createdAt:Date.now()-86400000*15},
+    {id:uid('p'), name:'Macaquito Mom', category:'macacoes', subcat:'', price:234, oldPrice:0, stock:11, sku:'MUV-MC-001', tag:'', description:'Macaquito modelagem mom, cintura alta.', image:'', active:true, createdAt:Date.now()-86400000*15},
     {id:uid('p'), name:'Short Rise', category:'shorts', subcat:'', price:139, oldPrice:0, stock:22, sku:'MUV-SH-001', tag:'', description:'Short cintura alta com bolso lateral.', image:'', active:true, createdAt:Date.now()-86400000*40},
     {id:uid('p'), name:'Legging Fit', category:'calcas', subcat:'', price:179, oldPrice:0, stock:4, sku:'MUV-CL-001', tag:'Últimas peças', description:'Legging com sustentação total e bolso lateral.', image:'', active:true, createdAt:Date.now()-86400000*50},
     {id:uid('p'), name:'Top Base', category:'top', subcat:'', price:99, oldPrice:119, stock:18, sku:'MUV-TP-001', tag:'Promoção', description:'Top básico de sustentação média.', image:'', active:true, createdAt:Date.now()-86400000*10},
