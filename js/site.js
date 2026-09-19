@@ -579,6 +579,48 @@
     });
   }
 
+  /* "Aproveite também": sugere outras peças no fim da página do produto */
+  const ppRelated = document.getElementById('ppRelated');
+  const ppRelatedGrid = document.getElementById('ppRelatedGrid');
+  function relEsc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+  function renderRelatedProducts(current){
+    if (!ppRelated || !ppRelatedGrid) return;
+    const pool = dedupeById(PRODUCTS.filter(x => x.id !== current.id && (x.stock === null || x.stock > 0)));
+    // prioriza mesma subcategoria, depois mesma seção, depois o resto
+    const score = x => (current.subcat && x.subcat === current.subcat ? 2 : 0) + (x.section === current.section ? 1 : 0);
+    const list = pool.map((x, i) => ({ x, i })).sort((a, b) => (score(b.x) - score(a.x)) || (a.i - b.i)).slice(0, 4).map(o => o.x);
+    if (!list.length){ ppRelated.style.display = 'none'; ppRelatedGrid.innerHTML = ''; return; }
+
+    ppRelatedGrid.innerHTML = list.map(x => {
+      const imgs = x.images.length ? x.images : ['<svg viewBox="0 0 60 60"></svg>'];
+      const dots = (x.colors || []).slice(0, 6).map(c =>
+        `<span class="prod-color-dot" style="background:${relEsc(c.hex || '#ccc')}" title="${relEsc(c.name || '')}"></span>`
+      ).join('');
+      const more = (x.colors || []).length > 6 ? `<span class="prod-color-more">+${x.colors.length - 6}</span>` : '';
+      const sizes = (x.sizes && x.sizes.length) ? x.sizes : (x.section === 'acessorios' ? [] : ['P', 'M', 'G']);
+      return `
+        <div class="prod-card" data-id="${relEsc(x.id)}">
+          <div class="prod-thumb">
+            <div class="img-a">${imgs[0]}</div>
+            <div class="img-b">${imgs[1] || imgs[0]}</div>
+          </div>
+          <h4>${relEsc(x.name)}</h4>
+          <div class="price">${x.oldPriceText ? `<span class="old">${relEsc(x.oldPriceText)}</span>` : ''}<strong>${brl(x.price)}</strong></div>
+          ${dots || more ? `<div class="prod-color-row">${dots}${more}</div>` : ''}
+          ${sizes.length ? `<div class="pp-rel-sizes">${sizes.map(s => `<span>${relEsc(s)}</span>`).join('')}</div>` : ''}
+        </div>`;
+    }).join('');
+    ppRelated.style.display = '';
+  }
+  if (ppRelatedGrid){
+    ppRelatedGrid.addEventListener('click', (e) => {
+      const card = e.target.closest('.prod-card');
+      if (card) openProductDetail(card.dataset.id);
+    });
+  }
+
   function openProductDetail(id, opts){
     const p = PRODUCTS.find(x => x.id === id);
     if (!p) return;
@@ -658,6 +700,7 @@
     if (ppReviewForm) ppReviewForm.reset();
     if (ppReviewStatus) { ppReviewStatus.textContent = ''; ppReviewStatus.className = 'pp-review-form-status'; }
     loadReviewsForProduct(id);
+    renderRelatedProducts(p);
 
     mainContent.classList.add('hidden');
     categoryPage.classList.remove('active');
