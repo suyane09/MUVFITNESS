@@ -1066,8 +1066,7 @@
     if (CATEGORY_LABELS[initialKey]) openCategoryPage(initialKey, { skipHistory: true });
   }
 
-  // Pills da seção "Conjuntos" na home (Conjuntos / Conjunto Short / Conjunto
-  // Calça): filtram os cards da própria vitrine em vez de abrir a página de
+  // Pills da seção "Conjuntos" na home (Conjunto Short / Conjunto Calça / Macaquito): filtram os cards da própria vitrine em vez de abrir a página de
   // categoria — por isso usam data-subcat-filter, não data-cat.
   (function setupConjuntosPillsFilter(){
     const bar = document.getElementById('conjuntosPills');
@@ -1076,12 +1075,31 @@
     const grid = document.getElementById('conjuntosGrid');
     if (!grid || !pills.length) return;
 
+    // Macaquito usa a mesma vitrine: copia os cards da seção (escondida) de
+    // Macaquitos para esta grade, marcados com subcat "macaquito". Os originais
+    // continuam no HTML, então busca, carrinho e página de categoria seguem iguais.
+    const macGrid = document.getElementById('macacaoGrid');
+    if (macGrid){
+      macGrid.querySelectorAll('.prod-card').forEach(card => {
+        const clone = card.cloneNode(true);
+        clone.dataset.subcat = 'macaquito';
+        clone.querySelector('.prod-thumb')?.classList.remove('img-loading');
+        clone.addEventListener('click', () => openProductDetail(clone.dataset.id));
+        grid.appendChild(clone);
+      });
+    }
+    const sectionTitle = document.querySelector('#conjuntos .section-head h2');
+    const seeAllLink = document.querySelector('#conjuntos .see-all-wrap a');
+
     function applyFilter(subcat){
       const norm = normalizeSubcat(subcat);
       grid.querySelectorAll('.prod-card').forEach(card => {
         const show = !norm || normalizeSubcat(card.dataset.subcat) === norm;
         card.style.display = show ? '' : 'none';
       });
+      // título e botão "Ver mais" acompanham a aba escolhida
+      if (sectionTitle) sectionTitle.textContent = norm === 'macaquito' ? 'Macaquitos' : 'Conjuntos';
+      if (seeAllLink) seeAllLink.dataset.cat = !norm ? 'conjuntos' : (norm === 'macaquito' ? 'macacoes' : 'conjuntos:' + norm);
       grid.scrollTo({ left: 0 });
       updateCarouselButtons(grid);
     }
