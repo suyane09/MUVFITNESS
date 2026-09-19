@@ -57,6 +57,10 @@
         var moreHtml = colorsArr.length > 6 ? '<span class="prod-color-more">+' + (colorsArr.length - 6) + '</span>' : '';
         colorDotsHtml = '<div class="prod-color-row">' + shown + moreHtml + '</div>';
       }
+      var sizesArr = (Array.isArray(p.sizes) && p.sizes.length) ? p.sizes : ((p.category || '').trim() === 'acessorios' ? [] : ['P', 'M', 'G']);
+      var sizesRowHtml = sizesArr.length
+        ? '<div class="prod-size-row">' + sizesArr.map(function(s){ return '<span>' + esc(s) + '</span>'; }).join('') + '</div>'
+        : '';
       return (
         '<div class="prod-card" data-id="' + esc(p.id) + '" data-subcat="' + esc(p.subcat || '') + '" data-name="' + esc(p.name) + '" data-price="' + price.toFixed(2) + '" data-stock="' + stockNum + '" data-colors="' + colorsJson + '" data-sizes="' + sizesJson + '" data-variants="' + variantsJson + '">' +
           '<div class="prod-thumb">' +
@@ -68,6 +72,7 @@
           '<h4>' + esc(p.name) + '</h4>' +
           '<div class="price">' + oldPriceHtml + '<strong>' + esc(brl(price)) + '</strong></div>' +
           colorDotsHtml +
+          sizesRowHtml +
           '<span class="install">' + installHtml + '</span>' +
         '</div>'
       );
@@ -609,7 +614,7 @@
           <h4>${relEsc(x.name)}</h4>
           <div class="price">${x.oldPriceText ? `<span class="old">${relEsc(x.oldPriceText)}</span>` : ''}<strong>${brl(x.price)}</strong></div>
           ${dots || more ? `<div class="prod-color-row">${dots}${more}</div>` : ''}
-          ${sizes.length ? `<div class="pp-rel-sizes">${sizes.map(s => `<span>${relEsc(s)}</span>`).join('')}</div>` : ''}
+          ${sizes.length ? `<div class="prod-size-row">${sizes.map(s => `<span>${relEsc(s)}</span>`).join('')}</div>` : ''}
         </div>`;
     }).join('');
     ppRelated.style.display = '';
@@ -857,6 +862,11 @@
     `
     : '';
 
+  const cardSizes = (p.sizes && p.sizes.length) ? p.sizes : (p.section === 'acessorios' ? [] : ['P', 'M', 'G']);
+  const sizesRowHtml = cardSizes.length
+    ? `<div class="prod-size-row">${cardSizes.map(s => `<span>${s}</span>`).join('')}</div>`
+    : '';
+
   return `
     <div
       class="prod-card"
@@ -880,6 +890,8 @@
       </div>
 
       ${colorDots}
+
+      ${sizesRowHtml}
 
       <span class="install">${p.install}</span>
     </div>

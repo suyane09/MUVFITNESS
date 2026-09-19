@@ -784,6 +784,10 @@
 .pp-related-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;}
 .pp-related-grid .prod-card{flex:none;min-width:0;}
 .pp-related-grid .prod-card h4{margin-top:2px;}
-.pp-rel-sizes{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-.pp-rel-sizes span{border:1px solid var(--ink-soft);color:var(--ink-soft);font-size:10.5px;line-height:1;padding:4px 7px;border-radius:2px;}
 @media(max-width:900px){.pp-related-grid{grid-template-columns:repeat(2,1fr);gap:14px;}}
+
+/* Cards: tamanhos no lugar do texto "Aceitamos cartão de crédito e Pix"
+   (o texto continua no HTML, só fica oculto no card — a página do produto ainda o usa) */
+.prod-card .install{display:none;}
+.prod-size-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.prod-size-row span{border:1px solid var(--ink-soft);color:var(--ink-soft);font-size:11px;font-weight:500;line-height:1;padding:5px 8px;border-radius:3px;}
