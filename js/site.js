@@ -1856,14 +1856,15 @@
 
             const order = buildOrderPayload(selectedPaymentMethod);
 
-            // O security.js (carregado no index.html) gera um campo oculto
-            // #device_id com o fingerprint antifraude do navegador, mas NÃO
-            // inclui esse valor automaticamente no formData do Brick — por
-            // isso lemos aqui e mandamos junto pro backend, que repassa pro
-            // Mercado Pago no header X-meli-session-id (api/process-payment.js).
-            const deviceId = (document.getElementById('device_id') || {}).value || '';
+            // O security.js (carregado no index.html com output="device_id")
+            // NÃO cria um elemento no HTML — ele cria uma variável global do
+            // JavaScript com esse mesmo nome (window.device_id). Por isso lemos
+            // a variável global aqui, e não um elemento do DOM. Como fallback,
+            // também tentamos o nome padrão que o Mercado Pago usa quando o
+            // SDK v2 coleta o Device ID sozinho (sem precisar do security.js).
+            const deviceId = window.device_id || window.MP_DEVICE_SESSION_ID || '';
             if (!deviceId) {
-              console.warn('[MUV pagamento] device_id ainda não estava pronto no momento do envio.');
+              console.warn('[MUV pagamento] device_id ainda não estava disponível no momento do envio.');
             }
 
             fetch('/api/process-payment', {
