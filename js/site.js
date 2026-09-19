@@ -1735,6 +1735,22 @@
     };
   }
 
+  // Motivos de recusa do Mercado Pago (status_detail) -> mensagem clara pra cliente.
+  const REJECTION_MESSAGES = {
+    cc_rejected_insufficient_amount: 'Cartão sem limite ou saldo suficiente. Tente outro cartão ou pague com Pix.',
+    cc_rejected_bad_filled_card_number: 'Confira o número do cartão e tente de novo.',
+    cc_rejected_bad_filled_date: 'Confira a data de validade do cartão e tente de novo.',
+    cc_rejected_bad_filled_security_code: 'Confira o código de segurança (CVV) do cartão e tente de novo.',
+    cc_rejected_bad_filled_other: 'Confira os dados do cartão e tente de novo.',
+    cc_rejected_call_for_authorize: 'Seu banco precisa autorizar esta compra. Fale com o banco ou tente outro cartão.',
+    cc_rejected_card_disabled: 'Este cartão está inativo. Ative-o com o banco ou use outro cartão.',
+    cc_rejected_duplicated_payment: 'Já existe um pagamento igual a este. Confira seu e-mail ou "Meus pedidos".',
+    cc_rejected_high_risk: 'Por segurança, este pagamento não foi aprovado. Tente outro cartão ou pague com Pix.',
+    cc_rejected_blacklist: 'Por segurança, este pagamento não foi aprovado. Tente outro cartão ou pague com Pix.',
+    cc_rejected_max_attempts: 'Limite de tentativas atingido. Use outro cartão ou pague com Pix.',
+    cc_rejected_other_reason: 'O banco do cartão não aprovou o pagamento. Tente outro cartão ou pague com Pix.'
+  };
+
   function handlePaymentResult(data, order){
     if (data.status === 'approved'){
       cart = [];
@@ -1753,7 +1769,7 @@
     } else {
       const errorMsg = document.getElementById('coErrorMsg');
       errorMsg.style.color = '';
-      errorMsg.textContent = 'Pagamento não aprovado. Confira os dados do cartão ou tente outra forma de pagamento.';
+      errorMsg.textContent = REJECTION_MESSAGES[data.status_detail] || 'Pagamento não aprovado. Confira os dados do cartão ou tente outra forma de pagamento.';
       errorMsg.classList.add('active');
       // O Brick não libera o botão "Pagar" sozinho depois de um pagamento
       // recusado — remontamos o formulário do zero pra cliente poder

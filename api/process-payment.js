@@ -17,9 +17,9 @@
         (point_of_interaction), que o Brick exibe automaticamente.
 
    E-mails de confirmação (Brevo):
-     - "Pedido recebido": disparado assim que a gente recebe a tentativa de
-       pagamento, ANTES de saber se vai ser aprovado — avisa a cliente que o
-       pedido chegou e está sendo processado.
+     - "Pedido recebido": disparado logo depois que o Mercado Pago responde,
+       desde que o pagamento não tenha sido recusado (aprovado, Pix pendente
+       ou em análise) — avisa a cliente que o pedido chegou.
      - "Pagamento aprovado": quando o cartão é aprovado NA HORA, mandamos
        daqui mesmo. Pra Pix, o pagamento só é aprovado depois que a cliente
        paga o QR Code — nesse caso quem manda esse e-mail é o webhook
@@ -135,14 +135,6 @@ export default async function handler(req, res) {
     // O webhook (api/mercadopago-webhook.js) usa esse número pra achar o pedido certo.
     const orderNumber = 'MUV' + Date.now().toString().slice(-8);
 
-    // Avisa a cliente na hora que o pedido chegou, antes de saber o
-    // resultado do pagamento.
-    // IMPORTANTE: usar await aqui. Em ambiente serverless (Vercel), a função
-    // pode ser encerrada assim que a resposta HTTP é enviada, cortando no
-    // meio um fetch ainda "em voo" — sem o await, o e-mail às vezes nem
-    // chegava a ser enviado por completo.
-    await sendOrderPlacedEmail({ ...order, orderNumber });
-
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const siteUrl = `${protocol}://${req.headers.host}`;
 
@@ -188,6 +180,17 @@ export default async function handler(req, res) {
       status_detail: data.status_detail,
       payment_method_id: data.payment_method_id
     });
+
+    // "Pedido recebido": só avisa a cliente se o pagamento NÃO foi recusado
+    // (aprovado, pendente/Pix ou em análise). Se o cartão foi recusado, não
+    // faz sentido dizer que o pedido foi recebido — ela vê o motivo na tela
+    // e tenta de novo.
+    // IMPORTANTE: usar await aqui. Em ambiente serverless (Vercel), a função
+    // pode ser encerrada assim que a resposta HTTP é enviada, cortando no
+    // meio um fetch ainda "em voo".
+    if (data.status !== 'rejected' && data.status !== 'cancelled') {
+      await sendOrderPlacedEmail({ ...order, orderNumber });
+    }
 
     if (data.status === 'approved') {
       // IMPORTANTE: usar await aqui pelo mesmo motivo do e-mail acima —
