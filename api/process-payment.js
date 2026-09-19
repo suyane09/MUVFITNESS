@@ -204,9 +204,14 @@ export default async function handler(req, res) {
 
     // formData vem pronto do Brick (token, payment_method_id, installments,
     // payer, transaction_amount etc.) — só completamos com os dados do pedido.
+    // O deviceId (fingerprint antifraude, gerado pelo script security.js no
+    // HTML da página) NÃO é um campo do corpo do pagamento — ele precisa ir
+    // separado, no header X-meli-session-id (ver abaixo). Por isso tiramos
+    // ele do formData antes de espalhar o resto no corpo.
+    const { deviceId, ...formDataWithoutDeviceId } = formData;
     const extra = buildExtraPaymentData(order);
     const paymentBody = {
-      ...formData,
+      ...formDataWithoutDeviceId,
       ...(extra.payerExtra ? { payer: { ...(formData.payer || {}), ...extra.payerExtra } } : {}),
       ...(extra.additional_info ? { additional_info: extra.additional_info } : {}),
       external_reference: orderNumber,
@@ -222,10 +227,20 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${accessToken}`,
         // Evita cobrança duplicada caso a requisição seja reenviada
         // (ex: instabilidade de rede) — cada tentativa de pedido tem sua chave.
-        'X-Idempotency-Key': orderNumber
+        'X-Idempotency-Key': orderNumber,
+        // Fingerprint antifraude do navegador da cliente (gerado pelo script
+        // security.js no HTML da página de checkout). Sem isso, o Mercado
+        // Pago não consegue validar a sessão e tende a recusar pagamentos
+        // por segurança mesmo com cartões válidos — foi a causa da maioria
+        // das recusas "por segurança, este pagamento não foi aprovado".
+        ...(deviceId ? { 'X-meli-session-id': deviceId } : {})
       },
       body: JSON.stringify(paymentBody)
     });
+
+    if (!deviceId) {
+      console.warn('[MUV pagamento] deviceId ausente no formData — verifique se o script security.js está no HTML do checkout.');
+    }
 
     const data = await mpRes.json();
 

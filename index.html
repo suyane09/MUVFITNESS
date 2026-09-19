@@ -780,6 +780,10 @@
 </a>
 
 <script src="https://sdk.mercadopago.com/js/v2"></script>
+<!-- Gera o Device ID (fingerprint antifraude) usado pelo Payment Brick.
+     Sem este script, o Mercado Pago não recebe o deviceId no formData e
+     tende a recusar pagamentos por segurança mesmo com cartões válidos. -->
+<script src="https://www.mercadopago.com/v2/security.js" view="checkout" output="device_id"></script>
 <script src="/js/site.js"></script>
 
 <script src="/js/supabase/supabase-config.js?v=4"></script>
